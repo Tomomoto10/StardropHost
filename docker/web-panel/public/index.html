@@ -15,6 +15,46 @@
     })();
   </script>
   <link rel="stylesheet" href="/css/style.css">
+  <style>
+    /* Fallback background so the page is never a plain white screen
+       while style.css loads or before the app div is shown. */
+    html { background: #12101a; }
+    html[data-theme='light'] { background: #f3f0fb; }
+
+    #app-loader {
+      position: fixed;
+      inset: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-direction: column;
+      gap: 14px;
+      background: inherit;
+      z-index: 9999;
+      transition: opacity 0.2s;
+    }
+    #app-loader.hidden { opacity: 0; pointer-events: none; }
+
+    .app-loader-dot {
+      width: 36px; height: 36px;
+      border: 3px solid rgba(167,139,250,0.2);
+      border-top-color: #a78bfa;
+      border-radius: 50%;
+      animation: loader-spin 0.9s linear infinite;
+    }
+    html[data-theme='light'] .app-loader-dot {
+      border-color: rgba(124,58,237,0.2);
+      border-top-color: #7c3aed;
+    }
+    @keyframes loader-spin { to { transform: rotate(360deg); } }
+
+    .app-loader-text {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      font-size: 14px;
+      color: #9e93c8;
+    }
+    html[data-theme='light'] .app-loader-text { color: #5b4d80; }
+  </style>
 </head>
 <body>
 
@@ -174,6 +214,11 @@
   </svg>
   <!-- ─────────────────────────────────────────────────────────── -->
 
+  <div id="app-loader">
+    <div class="app-loader-dot"></div>
+    <span class="app-loader-text">Loading StardropHost...</span>
+  </div>
+
   <div id="app" style="display:none">
 
     <!-- Sidebar -->
@@ -237,6 +282,7 @@
       <button class="mob-nav-item" type="button" data-page="saves"><svg class="icon"><use href="#icon-saves"></use></svg></button>
       <button class="mob-nav-item" type="button" data-page="mods"><svg class="icon"><use href="#icon-mods"></use></svg></button>
       <button class="mob-nav-item" type="button" data-page="logs"><svg class="icon"><use href="#icon-logs"></use></svg></button>
+      <button class="mob-nav-item" type="button" data-page="terminal"><svg class="icon"><use href="#icon-terminal"></use></svg></button>
       <button class="mob-nav-item" type="button" data-page="config"><svg class="icon"><use href="#icon-config"></use></svg></button>
     </nav>
 
@@ -560,8 +606,8 @@
       <h3 id="restartModalTitle">Restart Required</h3>
       <p id="restartModalMessage">Configuration saved. Restart the container for changes to take effect.</p>
       <div class="modal-actions">
-        <button class="btn btn-sm" type="button" onclick="closeRestartModal()" style="background:var(--bg-tertiary);color:var(--text-primary)">Later</button>
-        <button class="btn btn-sm btn-warning" type="button" onclick="confirmRestart()">Restart Now</button>
+        <button class="btn btn-sm btn-secondary" type="button" onclick="closeRestartModal()">Later</button>
+        <button class="btn btn-sm btn-warning" id="restartNowBtn" type="button" onclick="confirmRestart()">Restart Now</button>
       </div>
     </div>
   </div>

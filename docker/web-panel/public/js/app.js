@@ -8,6 +8,8 @@
   if (!API.token) { window.location.href = '/login.html'; return; }
   API.get('/api/auth/verify').then(data => {
     if (!data || !data.valid) { window.location.href = '/login.html'; return; }
+    const loader = document.getElementById('app-loader');
+    if (loader) loader.classList.add('hidden');
     document.getElementById('app').style.display = 'flex';
     init();
   }).catch(() => { window.location.href = '/login.html'; });
@@ -1053,7 +1055,7 @@ async function handleModUpload(input) {
   if (data?.success) {
     const msg = data.hasManifest
       ? 'Mod installed. Restart the server to load it.'
-      : data.noManifest
+      : !data.hasManifest
         ? 'Uploaded but no manifest.json found — check archive structure.'
         : 'Uploaded but auto-install failed. Restart may still install it.';
     showToast(msg, 'success');

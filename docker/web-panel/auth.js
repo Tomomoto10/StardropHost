@@ -167,8 +167,8 @@ async function setup(req, res) {
     return res.status(400).json({ error: 'Password and confirmation are required' });
   }
 
-  if (password.length < 6) {
-    return res.status(400).json({ error: 'Password must be at least 6 characters' });
+  if (password.length < 8) {
+    return res.status(400).json({ error: 'Password must be at least 8 characters' });
   }
 
   if (password !== confirmPassword) {

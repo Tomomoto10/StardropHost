@@ -187,14 +187,6 @@ function getConfig(req, res) {
     const items = fields.map(field => {
       let value = env[field.key] ?? process.env[field.key] ?? field.default ?? '';
 
-      // Offer save name select options if SAVE_NAME field
-      let options;
-      if (field.key === 'SAVE_NAME') {
-        if (!value) value = detectedSave;
-        options = [''].concat(availableSaves);
-        if (value && !options.includes(value)) options.push(value);
-      }
-
       // Sensitive: mask unless viewable
       const masked = field.sensitive && !field.viewable && value;
 
@@ -211,7 +203,7 @@ function getConfig(req, res) {
         min:          field.min,
         max:          field.max,
         maxLength:    field.maxLength,
-        options,
+        options:      field.options || undefined,
         value:        masked ? undefined : value,
         hasValue:     !!(env[field.key] || process.env[field.key]),
       };
