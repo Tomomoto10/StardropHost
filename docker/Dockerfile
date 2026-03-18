@@ -105,7 +105,7 @@ COPY --chown=steam:steam config/10-monitor.conf /etc/X11/xorg.conf.d/10-monitor.
 
 # -- Copy and install web panel --
 COPY --chown=steam:steam web-panel/ /home/steam/web-panel/
-RUN cd /home/steam/web-panel && npm ci --only=production
+RUN cd /home/steam/web-panel && npm ci --omit=dev
 
 # -- Run as root to allow permission fixes on startup --
 USER root

@@ -231,7 +231,7 @@ fi
 # Access logs any time with: ls ./logs/
 # ===========================================
 LOG_STAMP=$(date +%Y%m%d-%H%M%S)
-LOG_DIR="${SCRIPT_DIR}/logs"
+LOG_DIR="${INSTALL_DIR}/logs"
 mkdir -p "$LOG_DIR" 2>/dev/null || LOG_DIR="/tmp"
 LOG_FILE="${LOG_DIR}/install-instance${INSTANCE_NUM}-${LOG_STAMP}.log"
 exec > >(tee -a "$LOG_FILE") 2>&1
