@@ -21,8 +21,19 @@
 
 set +e
 
-# Directory where this script lives — logs go here
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" 2>/dev/null && pwd)"
+# Directory where this script lives — logs go here.
+# In pipe mode ($0 is the bash binary itself) fall back to $PWD.
+case "$0" in
+    bash|*/bash|-bash)
+        SCRIPT_DIR="$PWD"
+        PIPE_MODE=1
+        ;;
+    *)
+        SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" 2>/dev/null && pwd)"
+        PIPE_MODE=0
+        ;;
+esac
+QUICK_START_URL="https://raw.githubusercontent.com/Tomomoto10/StardropHost/main/quick-start.sh"
 
 # -- Colors --
 RED='\033[0;31m'
@@ -77,14 +88,23 @@ fi
 if [ "$(id -u)" != "0" ]; then
     if command -v sudo &>/dev/null; then
         echo -e "${BLUE}[>>]   Elevating with sudo...${NC}"
-        exec sudo bash "$0" "$@"
+
+        if [ "$PIPE_MODE" = "1" ]; then
+            # Piped via "curl ... | bash" — $0 is the bash binary, can't re-exec it.
+            # Re-fetch the script and hand it to sudo bash directly.
+            echo -e "${BLUE}[>>]   Pipe mode detected — re-fetching script under sudo...${NC}"
+            exec sudo bash -c \
+                "$(curl -fsSL "$QUICK_START_URL")" \
+                quick-start.sh "$@"
+        else
+            exec sudo bash "$0" "$@"
+        fi
 
     else
         # sudo not present — install it via su, then re-exec
         echo -e "${YELLOW}[WARN] sudo is not installed.${NC}"
         echo -e "${BLUE}[>>]   Attempting to install sudo (root password required)...${NC}"
 
-        # Detect package manager for install command
         if command -v apt-get &>/dev/null; then
             INSTALL_SUDO_CMD="apt-get install -y sudo"
         elif command -v dnf &>/dev/null; then
@@ -96,6 +116,7 @@ if [ "$(id -u)" != "0" ]; then
             echo ""
             echo "  Please install sudo manually, then re-run:"
             echo "    sudo bash quick-start.sh"
+            echo "  or: curl -fsSL $QUICK_START_URL | sudo bash"
             exit 1
         fi
 
@@ -105,17 +126,22 @@ if [ "$(id -u)" != "0" ]; then
         if [ $SUDO_INSTALL_RC -ne 0 ]; then
             echo -e "${RED}[ERR]  Failed to install sudo (exit code $SUDO_INSTALL_RC).${NC}"
             echo ""
-            echo "  You can run this script directly as root instead:"
-            echo "    su -c 'bash $0'"
+            echo "  Run directly as root: su -c 'curl -fsSL $QUICK_START_URL | bash'"
             exit 1
         fi
 
-        # Re-exec now that sudo is available
         if command -v sudo &>/dev/null; then
             echo -e "${GREEN}[OK]   sudo installed. Continuing...${NC}"
-            exec sudo bash "$0" "$@"
+            if [ "$PIPE_MODE" = "1" ]; then
+                exec sudo bash -c \
+                    "$(curl -fsSL "$QUICK_START_URL")" \
+                    quick-start.sh "$@"
+            else
+                exec sudo bash "$0" "$@"
+            fi
         else
-            echo -e "${RED}[ERR]  sudo still not found after install. Try: su -c 'bash $0'${NC}"
+            echo -e "${RED}[ERR]  sudo still not found after install.${NC}"
+            echo "  Try: su -c 'curl -fsSL $QUICK_START_URL | bash'"
             exit 1
         fi
     fi
