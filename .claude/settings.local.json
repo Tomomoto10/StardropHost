@@ -1,0 +1,7 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(grep -rn '\\\\\\\\\\\\s*$' /home/user/Documents/StardropHost/StardropHost/docker/web-panel/api/ --include=\"*.js\")"
+    ]
+  }
+}

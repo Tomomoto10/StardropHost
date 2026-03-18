@@ -43,14 +43,7 @@ function matchesFilter(filter, line) {
     return /\[\d{2}:\d{2}:\d{2}\s+(TRACE|DEBUG|INFO|WARN|ERROR)\s+(?!SMAPI\b|game\b)([^\]]+)\]/i.test(line);
   }
   if (filter === 'server') {
-    return /Starting LAN server|Starting server\. Protocol|\
-ServerOfflineMode|Multiplayer|Connection|\
-joined the game|left the game|farmhand|\
-player connected|player disconnected|\
-peer .* joined|peer .* left|\
-client .* connected|client .* disconnected|\
-Received connection for vanilla player|\
-Approved request for farmhand/i.test(line);
+    return /Starting LAN server|Starting server\. Protocol|ServerOfflineMode|Multiplayer|Connection|joined the game|left the game|farmhand|player connected|player disconnected|peer .* joined|peer .* left|client .* connected|client .* disconnected|Received connection for vanilla player|Approved request for farmhand/i.test(line);
   }
   if (filter === 'game') {
     return /\[\d{2}:\d{2}:\d{2}\s+(TRACE|DEBUG|INFO|WARN|ERROR)\s+game\]/i.test(line) &&
