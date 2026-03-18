@@ -13,7 +13,7 @@ services:
   stardrop-manager:
     build: ./docker/manager
     image: stardrop-manager:local
-    container_name: stardrop-manager
+    container_name: ${CONTAINER_PREFIX:-stardrop}-manager
     restart: unless-stopped
     environment:
       - PROJECT_DIR=${PWD}
@@ -30,7 +30,7 @@ services:
   stardrop-init:
     build: ./docker
     image: stardrop-server:local
-    container_name: stardrop-init
+    container_name: ${CONTAINER_PREFIX:-stardrop}-init
     user: root
     entrypoint: ["/home/steam/scripts/init-container.sh"]
     environment:
@@ -48,7 +48,7 @@ services:
   stardrop-server:
     build: ./docker
     image: stardrop-server:local
-    container_name: stardrop
+    container_name: ${CONTAINER_PREFIX:-stardrop}
     restart: unless-stopped
     depends_on:
       stardrop-manager:
@@ -67,7 +67,7 @@ services:
       - PUBLIC_IP=${PUBLIC_IP:-}
       - SERVER_PASSWORD=${SERVER_PASSWORD:-}
       - SAVE_NAME=${SAVE_NAME:-}
-      - PANEL_PORT=18642
+      - PANEL_PORT=${PANEL_PORT:-18642}
     ports:
       - "${GAME_PORT:-24642}:24642/udp"
       - "${VNC_PORT:-5900}:5900"
@@ -86,7 +86,7 @@ services:
   stardrop-steam-auth:
     build: ./docker/steam-auth
     image: stardrop-steam-auth:local
-    container_name: stardrop-steam-auth
+    container_name: ${CONTAINER_PREFIX:-stardrop}-steam-auth
     restart: unless-stopped
     environment:
       - STEAM_AUTH_PORT=18700
