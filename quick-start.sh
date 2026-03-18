@@ -251,10 +251,17 @@ install_docker() {
         curl -fsSL https://download.docker.com/linux/${OS_ID}/gpg \
             | gpg --dearmor -o /etc/apt/keyrings/docker.gpg 2>/dev/null
         chmod a+r /etc/apt/keyrings/docker.gpg
-        echo \
-            "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.gpg] \
-            https://download.docker.com/linux/${OS_ID} \
-            $(lsb_release -cs 2>/dev/null || . /etc/os-release && echo "$VERSION_CODENAME") stable" \
+        DOCKER_ARCH=$(dpkg --print-architecture)
+        DOCKER_CODENAME=$(lsb_release -cs 2>/dev/null || (. /etc/os-release && echo "$VERSION_CODENAME"))
+        # Docker only publishes repos for stable Debian releases; fall back to bookworm for trixie/sid/etc.
+        if [ "$OS_ID" = "debian" ]; then
+            case "$DOCKER_CODENAME" in
+                buster|bullseye|bookworm) ;;
+                *) print_warning "No Docker repo for Debian '$DOCKER_CODENAME', using bookworm packages"
+                   DOCKER_CODENAME="bookworm" ;;
+            esac
+        fi
+        echo "deb [arch=${DOCKER_ARCH} signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/${OS_ID} ${DOCKER_CODENAME} stable" \
             > /etc/apt/sources.list.d/docker.list
         apt-get update -qq
         apt-get install -y -qq docker-ce docker-ce-cli containerd.io docker-compose-plugin

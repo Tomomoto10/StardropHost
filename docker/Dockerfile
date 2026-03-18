@@ -30,13 +30,16 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     dotnet-sdk-6.0 \
     # Utilities
     procps net-tools \
-    # Node.js for web panel
-    nodejs npm \
     && \
     rm -rf /var/lib/apt/lists/* /var/cache/apt/archives/* \
            /usr/share/doc/* /usr/share/man/* /usr/share/info/* \
            /usr/share/lintian/* /usr/share/locale/* \
            /tmp/* /var/tmp/*
+
+# -- Install Node.js 18 (Ubuntu 22.04 ships Node 12 which lacks optional chaining) --
+RUN curl -fsSL https://deb.nodesource.com/setup_18.x | bash - && \
+    apt-get install -y nodejs && \
+    rm -rf /var/lib/apt/lists/* /var/cache/apt/archives/*
 
 # -- Create user and directories --
 RUN useradd -m -s /bin/bash steam && \
