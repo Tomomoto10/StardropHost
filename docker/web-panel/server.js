@@ -94,6 +94,7 @@ app.post(  '/api/saves/backups',              auth.verifyMiddleware, savesAPI.cr
 app.get(   '/api/saves/backups/status',       auth.verifyMiddleware, savesAPI.getBackupStatus);
 app.get(   '/api/saves/backups/:filename',    auth.verifyMiddleware, savesAPI.downloadBackup);
 app.delete('/api/saves/backups/:filename',    auth.verifyMiddleware, savesAPI.deleteBackup);
+app.delete('/api/saves/:name',               auth.verifyMiddleware, savesAPI.deleteSave);
 
 // -- Config --
 const configAPI = require('./api/config');

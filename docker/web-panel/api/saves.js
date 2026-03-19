@@ -622,6 +622,40 @@ function deleteBackup(req, res) {
   }
 }
 
+function deleteSave(req, res) {
+  try {
+    const saveName = typeof req.params?.name === 'string' ? req.params.name.trim() : '';
+    if (!saveName) return res.status(400).json({ error: 'Save name is required' });
+    if (saveName.includes('..') || saveName.includes('/')) {
+      return res.status(400).json({ error: 'Invalid save name' });
+    }
+
+    const saveDir = path.join(config.SAVES_DIR, saveName);
+    if (!fs.existsSync(saveDir)) {
+      return res.status(404).json({ error: 'Save not found' });
+    }
+
+    fs.rmSync(saveDir, { recursive: true, force: true });
+
+    // Clear selection if this was the active save
+    try {
+      if (getSelectedSaveName() === saveName) {
+        const markerPath = path.join(config.SAVES_DIR, '.selected_save');
+        if (fs.existsSync(markerPath)) fs.unlinkSync(markerPath);
+        if (fs.existsSync(STARTUP_PREFS_FILE)) {
+          const content = fs.readFileSync(STARTUP_PREFS_FILE, 'utf-8')
+            .replace(/^saveFolderName\s*=.*$/m, 'saveFolderName=');
+          fs.writeFileSync(STARTUP_PREFS_FILE, content, 'utf-8');
+        }
+      }
+    } catch {}
+
+    res.json({ success: true, message: `Save '${saveName}' deleted` });
+  } catch (e) {
+    res.status(500).json({ error: 'Failed to delete save', details: e.message });
+  }
+}
+
 module.exports = {
   getSaves,
   getBackups,
@@ -631,4 +665,5 @@ module.exports = {
   selectSave,
   downloadBackup,
   deleteBackup,
+  deleteSave,
 };

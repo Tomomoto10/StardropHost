@@ -843,12 +843,19 @@ async function loadSaves() {
           </div>
           <div class="save-actions">
             ${!s.isSelected ? `<button class="btn btn-sm" data-save-name="${escapeHtml(s.name)}">Select</button>` : ''}
+            <button class="btn btn-sm save-delete-btn" style="color:#ef4444;border-color:#ef4444"
+              data-save-name="${escapeHtml(s.name)}" data-farm="${escapeHtml(s.farmName || s.name)}">
+              ${icon('trash', 'icon')}</button>
           </div>
         </div>
       `).join('');
 
       list.querySelectorAll('[data-save-name]').forEach(btn => {
-        btn.onclick = () => selectSave(btn.dataset.saveName);
+        if (btn.classList.contains('save-delete-btn')) {
+          btn.onclick = () => deleteSave(btn.dataset.saveName, btn.dataset.farm);
+        } else {
+          btn.onclick = () => selectSave(btn.dataset.saveName);
+        }
       });
     }
   }
@@ -922,6 +929,21 @@ async function selectSave(saveName) {
   } else {
     showToast(data?.error || 'Failed to select save', 'error');
   }
+}
+
+async function deleteSave(saveName, farmName) {
+  const label = farmName || saveName;
+  const wantBackup = confirm(`Back up "${label}" before deleting?`);
+  if (wantBackup) {
+    showToast('Creating backup...', 'info');
+    await API.post('/api/saves/backups', {});
+    // Wait briefly for backup to start
+    await new Promise(r => setTimeout(r, 1000));
+  }
+  if (!confirm(`Permanently delete save "${label}"? This cannot be undone.`)) return;
+  const data = await API.del(`/api/saves/${encodeURIComponent(saveName)}`);
+  if (data?.success) { showToast('Save deleted', 'success'); loadSaves(); }
+  else showToast(data?.error || 'Delete failed', 'error');
 }
 
 async function deleteBackup(filename) {
@@ -1401,7 +1423,9 @@ async function loadMods() {
         ${m.description ? `<div class="mod-meta">${escapeHtml(m.description)}</div>` : ''}
       </div>
       <div style="display:flex;align-items:center;gap:8px">
-        <span class="mod-badge ${m.isCustom ? 'custom' : ''}">${m.isCustom ? 'Custom' : 'Bundled'}</span>
+        ${m.pendingInstall
+          ? '<span class="mod-badge" style="background:#f59e0b22;color:#f59e0b;border-color:#f59e0b55">Pending Install</span>'
+          : `<span class="mod-badge ${m.isCustom ? 'custom' : ''}">${m.isCustom ? 'Custom' : 'Bundled'}</span>`}
         ${m.isCustom
           ? `<button class="btn btn-sm mod-delete-btn" style="color:#ef4444;border-color:#ef4444"
                data-folder="${escapeHtml(m.folder)}" data-name="${escapeHtml(m.name)}">

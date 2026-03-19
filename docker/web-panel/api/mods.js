@@ -162,6 +162,29 @@ function getMods(req, res) {
     }
   } catch {}
 
+  // If game is not installed yet, show bundled mods directly from BUNDLED_MODS_DIR
+  if (!fs.existsSync(GAME_MODS_DIR) && fs.existsSync(BUNDLED_MODS_DIR)) {
+    try {
+      for (const entry of fs.readdirSync(BUNDLED_MODS_DIR, { withFileTypes: true })) {
+        if (!entry.isDirectory()) continue;
+        if (seenFolders.has(entry.name)) continue;
+
+        const manifest = readManifest(path.join(BUNDLED_MODS_DIR, entry.name), entry.name);
+        if (!manifest) continue;
+
+        mods.push({
+          ...manifest,
+          enabled:       false,
+          isBundled:     true,
+          isCustom:      false,
+          folder:        entry.name,
+          pendingInstall: true,
+        });
+        seenFolders.add(entry.name);
+      }
+    } catch {}
+  }
+
   // Scan custom-mods/ for uploads not yet installed (pending restart)
   try {
     if (fs.existsSync(CUSTOM_MODS_DIR)) {
