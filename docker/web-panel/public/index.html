@@ -658,7 +658,7 @@
           </div>
           <button id="wiz-steam-login-btn" class="btn btn-primary" style="width:100%;margin-bottom:14px" onclick="wizSteamLogin()">Login to Steam</button>
 
-          <!-- Step B: Guard code — hidden until Steam sends the email -->
+          <!-- Step B: Guard code — shown after Steam sends the email -->
           <div id="wiz-steam-guard-row" style="display:none;margin-bottom:14px">
             <label style="font-size:13px;color:var(--text-secondary);display:block;margin-bottom:5px">
               Steam Guard Code
@@ -671,18 +671,6 @@
           </div>
 
           <div id="wiz-steam-status" style="font-size:13px;color:var(--text-muted);margin-bottom:10px;min-height:16px"></div>
-
-          <!-- Live download log — shown once download starts -->
-          <div id="wiz-steam-log-wrap" style="display:none;margin-bottom:12px">
-            <div style="font-size:11px;color:var(--text-muted);margin-bottom:4px;display:flex;justify-content:space-between">
-              <span>Download log</span><span id="wiz-steam-log-hint" style="opacity:0.6"></span>
-            </div>
-            <div id="wiz-steam-log" style="
-              background:var(--bg-primary);border:1px solid var(--border);border-radius:6px;
-              padding:8px 10px;font-family:monospace;font-size:10.5px;line-height:1.6;
-              max-height:180px;overflow-y:auto;color:var(--text-secondary);
-            "><span style="opacity:0.5">Connecting to Steam…</span></div>
-          </div>
         </div>
 
         <!-- Continue only shown for local/path methods; steam auto-advances -->

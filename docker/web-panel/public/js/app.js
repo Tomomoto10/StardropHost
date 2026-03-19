@@ -96,8 +96,8 @@ let _steamDlLogLines    = 0;
 
 // Step A — initiate Steam login via steam-auth sidecar (this triggers the Guard email)
 async function wizSteamLogin() {
-  const user    = document.getElementById('wiz-steam-user')?.value?.trim();
-  const pass    = document.getElementById('wiz-steam-pass')?.value?.trim();
+  const user     = document.getElementById('wiz-steam-user')?.value?.trim();
+  const pass     = document.getElementById('wiz-steam-pass')?.value?.trim();
   const statusEl = document.getElementById('wiz-steam-status');
   const loginBtn = document.getElementById('wiz-steam-login-btn');
 
@@ -107,21 +107,22 @@ async function wizSteamLogin() {
     return;
   }
 
-  // Store for later use when triggering the download
+  // Store credentials in memory only — never written to disk here
   _wizState._steamUser = user;
   _wizState._steamPass = pass;
 
   loginBtn.disabled = true;
   loginBtn.textContent = 'Connecting to Steam…';
   statusEl.style.color = 'var(--text-secondary)';
-  statusEl.textContent = 'Logging in…';
+  statusEl.textContent = 'Connecting to Steam…';
 
   try {
     const data = await API.post('/api/steam/login', { username: user, password: pass });
-    if (data?.success || data?.state) {
-      statusEl.textContent = 'Waiting for Steam…';
+    if (data?.success) {
+      statusEl.style.color = '';
+      statusEl.textContent = 'Logging in… waiting for Steam Guard if required.';
       clearInterval(_steamAuthPollTimer);
-      _steamAuthPollTimer = setInterval(wizPollSteamAuth, 2000);
+      _steamAuthPollTimer = setInterval(wizPollSteamAuth, 3000);
     } else {
       loginBtn.disabled = false;
       loginBtn.textContent = 'Login to Steam';
@@ -132,47 +133,63 @@ async function wizSteamLogin() {
     loginBtn.disabled = false;
     loginBtn.textContent = 'Login to Steam';
     statusEl.style.color = 'var(--accent-error)';
-    statusEl.textContent = e.message || 'Could not reach Steam auth service.';
+    statusEl.textContent = e.message || 'Could not reach Steam auth service — is it running?';
   }
 }
 
-// Step B — poll steam-auth status; show guard row when email is sent
+// Step B — poll steam-auth status every 3s (mirrors the original working flow)
+// IMPORTANT: polling is NEVER stopped on guard_required — it keeps running so that
+// when the user submits the code and steam-auth transitions to 'online', the poll
+// detects it automatically without needing a manual interval restart.
 async function wizPollSteamAuth() {
-  const statusEl  = document.getElementById('wiz-steam-status');
-  const guardRow  = document.getElementById('wiz-steam-guard-row');
-  const loginBtn  = document.getElementById('wiz-steam-login-btn');
+  const statusEl = document.getElementById('wiz-steam-status');
+  const guardRow = document.getElementById('wiz-steam-guard-row');
+  const loginBtn = document.getElementById('wiz-steam-login-btn');
 
   try {
     const data = await API.get('/api/steam/status');
     if (!data) return;
 
     if (data.state === 'guard_required') {
-      clearInterval(_steamAuthPollTimer);
+      // Show guard row — keep polling so we detect 'online' after code is submitted
       guardRow.style.display = '';
       document.getElementById('wiz-steam-guard').focus();
       statusEl.style.color = 'var(--accent-warning,#f59e0b)';
-      statusEl.textContent = '📧 A Steam Guard code has been sent to your email — enter it above and click Submit Code.';
+      statusEl.textContent = data.lastError
+        ? '⚠️ ' + data.lastError + ' — try again.'
+        : '📧 A Steam Guard code has been sent to your email — enter it above and click Submit Code.';
 
     } else if (data.state === 'online') {
       clearInterval(_steamAuthPollTimer);
+      _steamAuthPollTimer = null;
       guardRow.style.display = 'none';
       statusEl.style.color = 'var(--accent)';
-      statusEl.textContent = '✅ Logged in! Starting game download…';
+      statusEl.textContent = '✅ Steam authenticated — starting game download…';
       _wizState._method = 'steam';
-      _wizState._steamGuard = document.getElementById('wiz-steam-guard')?.value?.trim() || '';
       wizTriggerSteamDownload();
 
     } else if (data.state === 'error') {
       clearInterval(_steamAuthPollTimer);
+      _steamAuthPollTimer = null;
       loginBtn.disabled = false;
       loginBtn.textContent = 'Login to Steam';
       statusEl.style.color = 'var(--accent-error)';
       statusEl.textContent = data.lastError || '❌ Steam login error — try again.';
+
+    } else if (data.state === 'unavailable') {
+      clearInterval(_steamAuthPollTimer);
+      _steamAuthPollTimer = null;
+      loginBtn.disabled = false;
+      loginBtn.textContent = 'Login to Steam';
+      statusEl.style.color = 'var(--accent-error)';
+      statusEl.textContent = '❌ Steam auth service unavailable — check container logs.';
     }
+    // state === 'logging_in' → keep polling, no UI change needed
   } catch {}
 }
 
-// Step C — submit the Guard code to steam-auth, keep polling
+// Step C — submit the Guard code to steam-auth
+// The polling interval is still running — it will detect 'online' automatically.
 async function wizSubmitSteamGuard() {
   const code     = document.getElementById('wiz-steam-guard')?.value?.trim();
   const statusEl = document.getElementById('wiz-steam-status');
@@ -187,13 +204,12 @@ async function wizSubmitSteamGuard() {
   guardBtn.disabled = true;
   guardBtn.textContent = 'Verifying…';
   statusEl.style.color = 'var(--text-secondary)';
-  statusEl.textContent = 'Submitting code…';
+  statusEl.textContent = 'Submitting Steam Guard code…';
 
   try {
     await API.post('/api/steam/guard', { code });
-    // Resume polling — steam-auth will transition to 'online' once confirmed
-    clearInterval(_steamAuthPollTimer);
-    _steamAuthPollTimer = setInterval(wizPollSteamAuth, 2000);
+    statusEl.style.color = 'var(--text-secondary)';
+    statusEl.textContent = 'Code submitted — waiting for Steam confirmation…';
   } catch (e) {
     statusEl.style.color = 'var(--accent-error)';
     statusEl.textContent = e.message || 'Failed to submit code — try again.';
@@ -213,7 +229,6 @@ async function wizTriggerSteamDownload() {
       steamUsername: _wizState._steamUser,
       steamPassword: _wizState._steamPass,
     };
-    if (_wizState._steamGuard) body.steamGuardCode = _wizState._steamGuard;
 
     const data = await API.post('/api/wizard/step/2', body);
     if (data?.success) {
