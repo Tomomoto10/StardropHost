@@ -695,11 +695,11 @@ show_next_steps() {
     fi
 
     echo -e "${BOLD}  Useful commands:${NC}"
-    echo -e "    Live logs:   ${CYAN}docker logs -f ${CONTAINER_PREFIX}${NC}"
-    echo -e "    Restart:     ${CYAN}cd $INSTALL_DIR && $COMPOSE_CMD restart${NC}"
-    echo -e "    Stop:        ${CYAN}cd $INSTALL_DIR && $COMPOSE_CMD down${NC}"
-    echo -e "    Update:      ${CYAN}cd $INSTALL_DIR && sudo bash update.sh${NC}"
-    echo -e "    Directory:   ${CYAN}$INSTALL_DIR${NC}"
+    echo -e "    ${CYAN}cd ./$(basename "$INSTALL_DIR")${NC}"
+    echo -e "    ${CYAN}docker logs -f ${CONTAINER_PREFIX}${NC}"
+    echo -e "    ${CYAN}sudo bash update.sh${NC}"
+    echo -e "    ${CYAN}$COMPOSE_CMD restart${NC}"
+    echo -e "    ${CYAN}$COMPOSE_CMD down${NC}"
     echo ""
 
     if [ "$REAL_USER" != "root" ]; then
