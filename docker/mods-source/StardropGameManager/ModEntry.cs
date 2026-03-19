@@ -12,13 +12,18 @@
  * menu.createdNewCharacter(true)) so Steam invite codes are generated correctly.
  * Save loading follows CoopMenu.HostFileSlot (multiplayerMode=2 BEFORE SaveGame.Load).
  *
- * Runtime events (cave choice, pet acceptance) are handled via UpdateTicked
- * so the server never blocks waiting for user input.
+ * Runtime events (cave choice, pet acceptance, pet naming) are handled via
+ * UpdateTicked so the server never blocks waiting for user input.
+ *
+ * Dialogue handling mirrors SMAPIDedicatedServerMod ProcessDialogueBehaviorLink:
+ *   - Question dialogues: match response text, set selectedResponse, receiveLeftClick
+ *   - NamingMenu: reflection to set textBox.Text, RecieveCommandInput('\r')
  */
 
 using System;
 using System.IO;
 using System.Linq;
+using System.Reflection;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using StardewModdingAPI;
@@ -38,96 +43,121 @@ namespace StardropGameManager
         public string FavoriteThing     { get; set; } = "Farming";
 
         // Farm layout
-        public int    FarmType          { get; set; } = 0;   // 0=Standard 1=Riverland 2=Forest
-                                                              // 3=Hill-top 4=Wilderness 5=FourCorners 6=Beach
-        public int    CabinCount        { get; set; } = 1;   // 1–3 (4 → capped at 3 with warning)
-        public string CabinLayout       { get; set; } = "separate"; // "nearby" | "separate"
+        public int    FarmType          { get; set; } = 0;
+        public int    CabinCount        { get; set; } = 1;
+        public string CabinLayout       { get; set; } = "separate";
 
         // Economy
-        public string MoneyStyle        { get; set; } = "shared";  // "shared" | "separate"
-        public string ProfitMargin      { get; set; } = "normal";  // "normal" | "75%" | "50%" | "25%"
+        public string MoneyStyle        { get; set; } = "shared";
+        public string ProfitMargin      { get; set; } = "normal";
 
         // World generation
-        public string CommunityCenterBundles { get; set; } = "normal";  // "normal" | "remixed"
+        public string CommunityCenterBundles    { get; set; } = "normal";
         public bool   GuaranteeYear1Completable { get; set; } = false;
-        public string MineRewards       { get; set; } = "normal";  // "normal" | "remixed"
+        public string MineRewards       { get; set; } = "normal";
         public bool   SpawnMonstersAtNight { get; set; } = false;
         [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
         public ulong? RandomSeed        { get; set; } = null;
 
-        // Pet (handled by runtime event watchers after save loads)
+        // Pet
         public bool   AcceptPet         { get; set; } = true;
-        public string PetSpecies        { get; set; } = "cat";  // "cat" | "dog"
-        public int    PetBreed          { get; set; } = 0;      // 0–4 (SDV 1.6 has 5 breeds per species)
+        public string PetSpecies        { get; set; } = "cat";
+        public int    PetBreed          { get; set; } = 0;
         public string PetName           { get; set; } = "Stella";
 
-        // Cave choice (handled by runtime event watcher)
-        public string MushroomsOrBats   { get; set; } = "mushrooms";  // "mushrooms" | "bats"
+        // Cave choice
+        public string MushroomsOrBats   { get; set; } = "mushrooms";
 
         // Joja route
         public bool   PurchaseJojaMembership { get; set; } = false;
 
         // Farmhand permissions
-        public string MoveBuildPermission { get; set; } = "off";  // "off" | "owned" | "on"
+        public string MoveBuildPermission { get; set; } = "off";
     }
 
     // ── Mod entry point ───────────────────────────────────────────────────────────
     public class ModEntry : Mod
     {
-        private const string NewFarmConfigPath  = "/home/steam/web-panel/data/new-farm.json";
+        private const string NewFarmConfigPath = "/home/steam/web-panel/data/new-farm.json";
 
-        private bool _started        = false;
-        private int  _titleMenuTicks = 5;    // ticks to wait after TitleMenu appears
+        // Reflection cache for NamingMenu.textBox (used for pet name entry)
+        private static readonly FieldInfo NamingMenuTextBoxField =
+            typeof(NamingMenu).GetField("textBox", BindingFlags.NonPublic | BindingFlags.Instance)!;
 
-        private NewFarmConfig? _cfg = null;  // persisted after creation for runtime handlers
+        // WaitCondition: require TitleMenu to be active for N consecutive ticks
+        private bool _farmStageEnabled = false;
+        private readonly WaitCondition _titleMenuCondition =
+            new WaitCondition(() => Game1.activeClickableMenu is TitleMenu, 5);
+
+        // Persisted after farm creation / save load for runtime handlers
+        private NewFarmConfig? _cfg = null;
+
+        // Runtime event flags — each handled only once per server session
+        private bool _petHandled    = false;
+        private bool _caveHandled   = false;
+        private int  _runtimeTick   = 0;
 
         public override void Entry(IModHelper helper)
         {
             helper.Events.GameLoop.UpdateTicked += OnUpdateTicked;
             helper.Events.GameLoop.SaveLoaded   += OnSaveLoaded;
-
             Monitor.Log("StardropGameManager loaded — waiting for TitleMenu.", LogLevel.Info);
         }
 
         // ── Per-tick handler ──────────────────────────────────────────────────────
         private void OnUpdateTicked(object? sender, UpdateTickedEventArgs e)
         {
-            // Keep the server bot alive (prevents pass-out interrupting end-of-day)
+            // Keep server bot alive (prevents pass-out blocking end-of-day)
             if (Context.IsWorldReady)
             {
                 Game1.player.health  = Game1.player.maxHealth;
                 Game1.player.stamina = Game1.player.maxStamina;
-
-                // Handle runtime events that need in-game responses
-                if (_cfg != null)
-                    HandleRuntimeEvents();
             }
 
-            if (_started) return;
-            if (!e.IsOneSecond) return;
+            // Once world is ready, handle any blocking runtime dialogues
+            if (Context.IsWorldReady && _cfg != null)
+            {
+                if (++_runtimeTick >= 60) // ~once per second
+                {
+                    _runtimeTick = 0;
+                    HandleRuntimeDialogues();
+                }
+            }
 
+            // Farm stage: wait until TitleMenu is stable, then run once
+            if (!_farmStageEnabled && _titleMenuCondition.IsMet())
+            {
+                _farmStageEnabled = true;
+                RunFarmStage();
+            }
+        }
+
+        // ── Farm stage — called once after TitleMenu is stable ────────────────────
+        private void RunFarmStage()
+        {
             if (Game1.activeClickableMenu is not TitleMenu menu)
             {
-                _titleMenuTicks = 5;
+                // TitleMenu disappeared between IsMet() and here — retry next tick
+                _farmStageEnabled = false;
+                _titleMenuCondition.Reset();
                 return;
             }
-
-            if (_titleMenuTicks > 0) { _titleMenuTicks--; return; }
-
-            _started = true;
 
             try
             {
                 if (TryLoadExistingSave()) return;
                 if (TryCreateNewFarm(menu)) return;
 
-                Monitor.Log("StardropGameManager: no saves and no new-farm.json. Waiting…", LogLevel.Debug);
-                _started = false;
+                // Neither condition met — reset and keep polling
+                Monitor.Log("[StardropGameManager] No saves and no new-farm.json. Waiting…", LogLevel.Debug);
+                _farmStageEnabled = false;
+                _titleMenuCondition.Reset();
             }
             catch (Exception ex)
             {
                 Monitor.Log($"[StardropGameManager] Startup error: {ex}", LogLevel.Error);
-                _started = false;
+                _farmStageEnabled = false;
+                _titleMenuCondition.Reset();
             }
         }
 
@@ -166,7 +196,6 @@ namespace StardropGameManager
             if (slotName == null) return false;
 
             Monitor.Log($"[StardropGameManager] Loading save '{slotName}' as co-op host.", LogLevel.Info);
-
             Game1.multiplayerMode = 2;
             SaveGame.Load(slotName);
             Game1.exitActiveMenu();
@@ -205,7 +234,7 @@ namespace StardropGameManager
                 $"(type={cfg.FarmType}, cabins={cfg.CabinCount}, pet={cfg.PetSpecies}/{cfg.PetBreed})",
                 LogLevel.Info);
 
-            // Persist config for runtime event handlers (pet, cave, joja)
+            // Persist config for runtime event handlers
             _cfg = cfg;
 
             // ── Reset player state (mirrors CoopMenu.HostNewFarmSlot) ─────────────
@@ -219,17 +248,17 @@ namespace StardropGameManager
                                                     ? "Farming" : cfg.FavoriteThing;
             Game1.player.isCustomized.Value  = true;
 
-            // ── Pet (species + breed set at creation; name + acceptance at runtime) ─
-            Game1.player.catPerson       = !string.Equals(cfg.PetSpecies, "dog",
-                                               StringComparison.OrdinalIgnoreCase);
-            Game1.player.whichPetBreed   = Math.Clamp(cfg.PetBreed, 0, 4);
+            // ── Pet ───────────────────────────────────────────────────────────────
+            Game1.player.catPerson     = !string.Equals(cfg.PetSpecies, "dog",
+                                             StringComparison.OrdinalIgnoreCase);
+            Game1.player.whichPetBreed = Math.Clamp(cfg.PetBreed, 0, 4);
 
             // ── Cabins ────────────────────────────────────────────────────────────
             int cabins = Math.Clamp(cfg.CabinCount, 1, 3);
             if (cfg.CabinCount > 3)
-                Monitor.Log("[StardropGameManager] CabinCount >3 capped at 3 — add more via Carpenter's Shop.", LogLevel.Warn);
-            Game1.startingCabins  = cabins;
-            Game1.cabinsSeparate  = string.Equals(cfg.CabinLayout, "separate",
+                Monitor.Log("[StardropGameManager] CabinCount >3 capped at 3.", LogLevel.Warn);
+            Game1.startingCabins = cabins;
+            Game1.cabinsSeparate = string.Equals(cfg.CabinLayout, "separate",
                                         StringComparison.OrdinalIgnoreCase);
 
             // ── Economy ───────────────────────────────────────────────────────────
@@ -265,8 +294,8 @@ namespace StardropGameManager
                 Game1.startingGameSeed = cfg.RandomSeed;
 
             // ── Trigger native co-op farm creation ────────────────────────────────
-            // multiplayerMode=2 BEFORE createdNewCharacter(true) — this is what ensures
-            // a native co-op game with Steam invite codes (not an SP→MP conversion)
+            // multiplayerMode=2 BEFORE createdNewCharacter(true) — ensures a proper
+            // co-op game with Steam invite codes (not an SP→MP conversion).
             Game1.multiplayerMode = 2;
             menu.createdNewCharacter(true);
 
@@ -278,23 +307,23 @@ namespace StardropGameManager
         // ── Post-load setup ───────────────────────────────────────────────────────
         private void OnSaveLoaded(object? sender, SaveLoadedEventArgs e)
         {
-            // Remove the built-in player cap so any number of farmhands can connect
+            // Remove built-in player cap so any number of farmhands can connect
             try { Game1.netWorldState.Value.CurrentPlayerLimit.Value = int.MaxValue; }
             catch (Exception ex) { Monitor.Log($"[StardropGameManager] Could not remove player limit: {ex.Message}", LogLevel.Warn); }
 
-            // Apply move-build permission via chat command (same as SMAPIDedicatedServerMod)
+            // Apply move-build permission via chat command
             if (_cfg != null)
             {
-                var perm = _cfg.MoveBuildPermission?.ToLower() ?? "off";
+                var perm = _cfg.MoveBuildPermission?.ToLowerInvariant() ?? "off";
                 if (perm != "off")
                 {
-                    try { Game1.chatBox?.textBoxEnter($"/mbp {perm}"); }
-                    catch { /* chatBox not ready yet — harmless */ }
+                    try { (Game1.chatBox as ChatBox)?.textBoxEnter($"/mbp {perm}"); }
+                    catch { /* chatBox not ready — harmless */ }
                 }
                 Monitor.Log(
                     $"[StardropGameManager] Server ready. " +
                     $"MoveBuildPermission={_cfg.MoveBuildPermission} | " +
-                    $"Pet={_cfg.PetSpecies} breed {_cfg.PetBreed} (accept={_cfg.AcceptPet}) | " +
+                    $"Pet={_cfg.PetSpecies}/{_cfg.PetBreed} (accept={_cfg.AcceptPet}) | " +
                     $"Cave={_cfg.MushroomsOrBats} | Joja={_cfg.PurchaseJojaMembership}",
                     LogLevel.Info);
             }
@@ -302,78 +331,92 @@ namespace StardropGameManager
             Monitor.Log("[StardropGameManager] Server ready for connections.", LogLevel.Info);
         }
 
-        // ── Runtime event handlers ────────────────────────────────────────────────
-        // Handles dialogs that fire days into gameplay (pet acceptance, cave choice, Joja).
-        // Checks once per second to avoid performance cost.
-        private int _runtimeCheckTick = 0;
-        private bool _petHandled    = false;
-        private bool _caveHandled   = false;
-        private bool _jojaHandled   = false;
-
-        private void HandleRuntimeEvents()
+        // ── Runtime dialogue handler ──────────────────────────────────────────────
+        // Handles blocking menus that appear mid-gameplay: pet question, pet naming,
+        // cave choice. Mirrors SMAPIDedicatedServerMod ProcessDialogueBehaviorLink.
+        private void HandleRuntimeDialogues()
         {
-            if (++_runtimeCheckTick < 60) return; // roughly once per second
-            _runtimeCheckTick = 0;
-
+            if (Game1.activeClickableMenu == null) return;
             var cfg = _cfg!;
 
-            // ── Pet acceptance (Marnie visits with pet in year 1) ─────────────────
-            if (!_petHandled && Game1.activeClickableMenu is DialogueBox petDlg)
+            // ── DialogueBox (question menus) ──────────────────────────────────────
+            if (Game1.activeClickableMenu is DialogueBox db && db.isQuestion && db.responses != null)
             {
-                var text = GetDialogueText(petDlg);
-                if (text != null && (text.Contains("cat") || text.Contains("dog") ||
-                    text.Contains("pet") || text.Contains("adopt")))
+                int mushroomsIdx = -1, batsIdx = -1, yesIdx = -1, noIdx = -1;
+                for (int i = 0; i < db.responses.Count; i++)
                 {
-                    if (cfg.AcceptPet)
-                    {
-                        // Accept the pet and set the configured name
-                        try
-                        {
-                            Game1.player.hasPet();
-                            _petHandled = true;
-                            Monitor.Log($"[StardropGameManager] Pet accepted (species={cfg.PetSpecies}, name={cfg.PetName}).", LogLevel.Info);
-                        }
-                        catch { /* Game API may vary — log only */ }
-                    }
-                    else
-                    {
-                        // Decline
-                        try { petDlg.closeDialogue(); }
-                        catch { }
-                        _petHandled = true;
-                        Monitor.Log("[StardropGameManager] Pet declined (AcceptPet=false).", LogLevel.Info);
-                    }
+                    var text = db.responses[i].responseText?.ToLowerInvariant() ?? "";
+                    if (text == "mushrooms") mushroomsIdx = i;
+                    else if (text == "bats")  batsIdx = i;
+                    else if (text == "yes")   yesIdx  = i;
+                    else if (text == "no")    noIdx   = i;
+                }
+
+                // Cave question (Demetrius ~Day 5 Year 1)
+                if (!_caveHandled && mushroomsIdx >= 0 && batsIdx >= 0)
+                {
+                    db.selectedResponse = string.Equals(cfg.MushroomsOrBats, "bats",
+                        StringComparison.OrdinalIgnoreCase) ? batsIdx : mushroomsIdx;
+                    db.receiveLeftClick(0, 0);
+                    _caveHandled = true;
+                    Monitor.Log($"[StardropGameManager] Cave choice: {cfg.MushroomsOrBats}.", LogLevel.Info);
+                }
+                // Pet question (Marnie ~Day 3 Year 1)
+                else if (!_petHandled && yesIdx >= 0 && noIdx >= 0)
+                {
+                    db.selectedResponse = cfg.AcceptPet ? yesIdx : noIdx;
+                    db.receiveLeftClick(0, 0);
+                    if (!cfg.AcceptPet) _petHandled = true;
+                    Monitor.Log($"[StardropGameManager] Pet question answered (accept={cfg.AcceptPet}).", LogLevel.Info);
                 }
             }
 
-            // ── Cave choice (Demetrius visits around Day 5 Year 1) ───────────────
-            if (!_caveHandled && Game1.activeClickableMenu is DialogueBox caveDlg)
+            // ── NamingMenu (pet name entry, appears after accepting pet) ──────────
+            if (!_petHandled && Game1.activeClickableMenu is NamingMenu nm)
             {
-                var text = GetDialogueText(caveDlg);
-                if (text != null && (text.Contains("cave") || text.Contains("mushroom") || text.Contains("bat")))
+                try
                 {
-                    bool chooseMushrooms = !string.Equals(cfg.MushroomsOrBats, "bats",
-                                               StringComparison.OrdinalIgnoreCase);
-                    try
+                    var textBox = NamingMenuTextBoxField.GetValue(nm) as TextBox;
+                    if (textBox != null)
                     {
-                        // Response 0 = mushrooms, Response 1 = bats (vanilla order)
-                        if (caveDlg.responses != null && caveDlg.responses.Count >= 2)
-                        {
-                            int choice = chooseMushrooms ? 0 : 1;
-                            caveDlg.selectedResponse = choice;
-                        }
-                        _caveHandled = true;
-                        Monitor.Log($"[StardropGameManager] Cave choice: {cfg.MushroomsOrBats}.", LogLevel.Info);
+                        textBox.Text = string.IsNullOrWhiteSpace(cfg.PetName) ? "Stella" : cfg.PetName;
+                        textBox.RecieveCommandInput('\r');
+                        _petHandled = true;
+                        Monitor.Log($"[StardropGameManager] Pet named '{cfg.PetName}'.", LogLevel.Info);
                     }
-                    catch { _caveHandled = true; }
+                }
+                catch (Exception ex)
+                {
+                    Monitor.Log($"[StardropGameManager] Pet naming failed: {ex.Message}", LogLevel.Warn);
+                    _petHandled = true; // don't get stuck
                 }
             }
         }
 
-        private static string? GetDialogueText(DialogueBox box)
+        // ── WaitCondition helper ──────────────────────────────────────────────────
+        private sealed class WaitCondition
         {
-            try { return box.getCurrentString(); }
-            catch { return null; }
+            private readonly Func<bool> _condition;
+            private readonly int        _initialWait;
+            private int                 _counter;
+
+            public WaitCondition(Func<bool> condition, int initialWait)
+            {
+                _condition   = condition;
+                _initialWait = initialWait;
+                _counter     = initialWait;
+            }
+
+            /// <summary>Returns true once the condition has been continuously met for
+            /// <c>initialWait</c> consecutive ticks.</summary>
+            public bool IsMet()
+            {
+                if (_counter <= 0 && _condition()) return true;
+                _counter--;
+                return false;
+            }
+
+            public void Reset() => _counter = _initialWait;
         }
     }
 }

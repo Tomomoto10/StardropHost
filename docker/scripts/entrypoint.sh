@@ -438,9 +438,7 @@ log_step "Step 3.6: Building StardropGameManager mod..."
 SGM_SRC="/home/steam/mod-source/StardropGameManager"
 SGM_DEST="/home/steam/preinstalled-mods/StardropGameManager"
 
-if [ -f "$SGM_DEST/StardropGameManager.dll" ]; then
-    log_info "✅ StardropGameManager already built"
-elif [ -d "$SGM_SRC" ]; then
+if [ -d "$SGM_SRC" ]; then
     log_info "Building StardropGameManager against game files..."
     dotnet build "$SGM_SRC" -c Release \
         /p:GamePath=/home/steam/stardewvalley \
@@ -631,14 +629,14 @@ cd /home/steam/stardewvalley
 log_info "Starting event handler..."
 /home/steam/scripts/event-handler.sh &
 
-# New farm config — FarmAutoCreate SMAPI mod handles creation automatically.
+# New farm config — StardropGameManager SMAPI mod handles creation automatically.
 # The mod reads new-farm.json once the title screen appears and creates
-# the farm using Stardew's own C# API (no xdotool required).
+# the farm using Stardew's own C# API (native co-op, Steam invite codes work).
 NEW_FARM_CONFIG="/home/steam/web-panel/data/new-farm.json"
 SAVES_DIR="/home/steam/.config/StardewValley/Saves"
 if [ -f "$NEW_FARM_CONFIG" ]; then
     if [ ! "$(ls -A "$SAVES_DIR" 2>/dev/null)" ]; then
-        log_info "New farm config detected — FarmAutoCreate mod will create it on title screen"
+        log_info "New farm config detected — StardropGameManager will create farm on title screen"
     else
         log_info "Save files already exist — removing new-farm.json"
         rm -f "$NEW_FARM_CONFIG"
