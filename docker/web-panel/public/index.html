@@ -223,8 +223,8 @@
 
     <!-- Sidebar -->
     <nav id="sidebar">
-      <div class="sidebar-header">
-        <span class="logo-mark"><svg class="icon"><use href="#icon-logo"></use></svg></span>
+      <div class="sidebar-header" style="flex-direction:column;align-items:center;padding:20px 8px 14px;gap:6px">
+        <img src="/favicon.png" style="width:52px;height:52px;object-fit:contain;display:block">
         <span class="logo-text">StardropHost</span>
       </div>
       <ul class="nav-menu">
@@ -574,7 +574,7 @@
             </div>
           </div>
           <div class="card" style="margin-top:16px">
-            <h3>VNC Remote Access</h3>
+            <h3>VNC & Display Settings</h3>
             <div id="vncPanel">
               <div class="empty-state">Loading VNC status...</div>
             </div>
@@ -625,20 +625,43 @@
         </div>
 
         <div id="wiz-method-local" style="display:none">
-          <div class="card" style="background:var(--bg-tertiary);margin-bottom:12px">
-            <p style="font-size:13px;margin:0 0 8px;color:var(--text-secondary)">Copy your Stardew Valley folder contents to this path on your server:</p>
-            <code id="wiz-game-path" style="display:block;font-size:12px;background:var(--bg-primary);padding:8px 10px;border-radius:6px;color:var(--accent);word-break:break-all"></code>
+          <div style="margin-bottom:12px">
+            <label style="font-size:13px;color:var(--text-secondary);display:block;margin-bottom:6px">Option A — Scan an existing install on this server</label>
+            <div style="display:flex;gap:8px;margin-bottom:6px">
+              <input id="wiz-scan-path" class="input" type="text" placeholder="/path/to/Stardew Valley" style="flex:1">
+              <button class="btn btn-secondary" onclick="wizScanGamePath()">Scan</button>
+            </div>
+            <div id="wiz-scan-status" style="font-size:12px;color:var(--text-muted);min-height:16px"></div>
           </div>
-          <p style="font-size:12px;color:var(--text-muted);margin-bottom:12px">On Windows the game is usually at <code>C:\Program Files (x86)\Steam\steamapps\common\Stardew Valley\</code></p>
+          <div class="card" style="background:var(--bg-tertiary);margin-bottom:12px">
+            <p style="font-size:13px;margin:0 0 8px;color:var(--text-secondary)">Option B — Copy files manually to this path on the server:</p>
+            <code id="wiz-game-path" style="display:block;font-size:12px;background:var(--bg-primary);padding:8px 10px;border-radius:6px;color:var(--accent);word-break:break-all"></code>
+            <p style="font-size:12px;color:var(--text-muted);margin:8px 0 0">On Windows the game is usually at <code>C:\Program Files (x86)\Steam\steamapps\common\Stardew Valley\</code></p>
+          </div>
           <button class="btn btn-secondary" style="width:100%;margin-bottom:8px" onclick="wizCheckGameFiles()">Check for Game Files</button>
           <div id="wiz-files-status" style="font-size:13px;text-align:center;min-height:20px"></div>
         </div>
 
         <div id="wiz-method-steam" style="display:none">
-          <div class="card" style="background:var(--bg-tertiary)">
-            <p style="font-size:13px;margin:0 0 6px;color:var(--text-secondary)">Steam download is configured in the <strong>Config</strong> tab after setup.</p>
-            <p style="font-size:12px;color:var(--text-muted);margin:0">You'll need your Steam username and password. The game downloads automatically once configured.</p>
+          <div style="display:grid;gap:12px;margin-bottom:12px">
+            <div>
+              <label style="font-size:13px;color:var(--text-secondary);display:block;margin-bottom:5px">Steam Username</label>
+              <input id="wiz-steam-user" class="input" type="text" placeholder="your_steam_username" style="width:100%">
+            </div>
+            <div>
+              <label style="font-size:13px;color:var(--text-secondary);display:block;margin-bottom:5px">Steam Password</label>
+              <input id="wiz-steam-pass" class="input" type="password" placeholder="Steam password" style="width:100%">
+            </div>
           </div>
+          <div id="wiz-steam-guard-row" style="display:none;margin-bottom:12px">
+            <label style="font-size:13px;color:var(--text-secondary);display:block;margin-bottom:5px">Steam Guard Code</label>
+            <div style="display:flex;gap:8px">
+              <input id="wiz-steam-guard" class="input" type="text" placeholder="Enter your Steam Guard code" style="flex:1">
+              <button class="btn btn-primary" onclick="wizSubmitSteamGuard()">Submit</button>
+            </div>
+          </div>
+          <div id="wiz-steam-status" style="font-size:13px;color:var(--text-muted);margin-bottom:12px;min-height:16px"></div>
+          <button class="btn btn-primary" style="width:100%" onclick="wizStartSteamDownload()">Login &amp; Download Game</button>
         </div>
 
         <div style="display:flex;justify-content:flex-end;margin-top:20px">
@@ -649,15 +672,28 @@
       <!-- Step 3: Resources -->
       <div id="wiz-step-3" class="wiz-step card" style="display:none">
         <h3 style="margin-bottom:4px">Resource Limits <span style="font-size:12px;font-weight:400;color:var(--text-muted)">(optional)</span></h3>
-        <p style="font-size:13px;color:var(--text-secondary);margin-bottom:20px">Limit how much CPU and RAM the server can use. Leave blank for no limits.</p>
+        <p style="font-size:13px;color:var(--text-secondary);margin-bottom:20px">Limit how much CPU and RAM the server can use.</p>
         <div style="display:grid;gap:14px">
           <div>
-            <label style="font-size:13px;color:var(--text-secondary);display:block;margin-bottom:6px">CPU Cores (e.g. <code>2</code> or <code>2.5</code>)</label>
-            <input id="wiz-cpu" class="input" type="text" placeholder="No limit" style="width:100%">
+            <label style="font-size:13px;color:var(--text-secondary);display:block;margin-bottom:6px">CPU Cores</label>
+            <select id="wiz-cpu" class="input" style="width:100%">
+              <option value="">No limit</option>
+              <option value="1">1 core</option>
+              <option value="2">2 cores</option>
+              <option value="4">4 cores</option>
+              <option value="8">8 cores</option>
+            </select>
           </div>
           <div>
-            <label style="font-size:13px;color:var(--text-secondary);display:block;margin-bottom:6px">Memory (e.g. <code>2g</code> or <code>512m</code>)</label>
-            <input id="wiz-mem" class="input" type="text" placeholder="No limit" style="width:100%">
+            <label style="font-size:13px;color:var(--text-secondary);display:block;margin-bottom:6px">Memory</label>
+            <select id="wiz-mem" class="input" style="width:100%">
+              <option value="">No limit</option>
+              <option value="1g">1 GB</option>
+              <option value="2g">2 GB</option>
+              <option value="4g">4 GB</option>
+              <option value="8g">8 GB</option>
+              <option value="16g">16 GB</option>
+            </select>
           </div>
         </div>
         <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:20px">

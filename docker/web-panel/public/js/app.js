@@ -67,6 +67,96 @@ function wizSetMethod(method) {
   }
 }
 
+async function wizScanGamePath() {
+  const pathInput = document.getElementById('wiz-scan-path');
+  const statusEl  = document.getElementById('wiz-scan-status');
+  const gamePath  = pathInput?.value?.trim();
+  if (!gamePath) { statusEl.textContent = 'Enter a path first.'; return; }
+
+  statusEl.style.color = 'var(--text-secondary)';
+  statusEl.textContent = 'Scanning…';
+  try {
+    const data = await API.post('/api/wizard/step/2', { method: 'path', gamePath });
+    if (data?.success) {
+      statusEl.style.color = 'var(--accent)';
+      statusEl.textContent = '✅ Game files found and registered!';
+      _wizState._filesFound = true;
+      _wizState._method = 'path';
+      document.getElementById('wiz-step2-next').disabled = false;
+    }
+  } catch (e) {
+    statusEl.style.color = 'var(--accent-error)';
+    statusEl.textContent = e.message || '❌ Path not found or missing game files.';
+  }
+}
+
+let _steamPollTimer = null;
+
+async function wizStartSteamDownload() {
+  const user = document.getElementById('wiz-steam-user')?.value?.trim();
+  const pass = document.getElementById('wiz-steam-pass')?.value?.trim();
+  const statusEl = document.getElementById('wiz-steam-status');
+  if (!user || !pass) { statusEl.textContent = 'Enter your Steam username and password.'; return; }
+
+  statusEl.style.color = 'var(--text-secondary)';
+  statusEl.textContent = 'Connecting to Steam…';
+
+  try {
+    // Initiate login via steam-auth container (proxied through web panel)
+    const data = await API.post('/api/steam/login', { username: user, password: pass });
+    if (data?.success) {
+      statusEl.textContent = 'Logging in… waiting for Steam Guard if required.';
+      _steamPollTimer = setInterval(wizPollSteamStatus, 3000);
+    } else {
+      statusEl.style.color = 'var(--accent-error)';
+      statusEl.textContent = data?.error || 'Login failed.';
+    }
+  } catch (e) {
+    statusEl.style.color = 'var(--accent-error)';
+    statusEl.textContent = e.message || 'Failed to reach Steam auth service.';
+  }
+}
+
+async function wizPollSteamStatus() {
+  const statusEl = document.getElementById('wiz-steam-status');
+  try {
+    const data = await API.get('/api/steam/status');
+    if (!data) return;
+
+    if (data.state === 'guard_required') {
+      statusEl.textContent = data.lastError || 'Steam Guard code required.';
+      document.getElementById('wiz-steam-guard-row').style.display = '';
+    } else if (data.state === 'online') {
+      clearInterval(_steamPollTimer);
+      statusEl.style.color = 'var(--accent)';
+      statusEl.textContent = '✅ Steam logged in! Game download will begin on server start.';
+      document.getElementById('wiz-steam-guard-row').style.display = 'none';
+      await API.post('/api/wizard/step/2', { method: 'steam' });
+      _wizState._filesFound = true;
+      _wizState._method = 'steam';
+      document.getElementById('wiz-step2-next').disabled = false;
+    } else if (data.state === 'error') {
+      clearInterval(_steamPollTimer);
+      statusEl.style.color = 'var(--accent-error)';
+      statusEl.textContent = data.lastError || 'Steam login error.';
+    }
+  } catch {}
+}
+
+async function wizSubmitSteamGuard() {
+  const code = document.getElementById('wiz-steam-guard')?.value?.trim();
+  const statusEl = document.getElementById('wiz-steam-status');
+  if (!code) return;
+  statusEl.style.color = 'var(--text-secondary)';
+  statusEl.textContent = 'Submitting Steam Guard code…';
+  try {
+    await API.post('/api/steam/guard', { code });
+  } catch (e) {
+    statusEl.style.color = 'var(--accent-error)';
+    statusEl.textContent = e.message || 'Failed to submit code.';
+  }
+}
+
 async function wizCheckGameFiles() {
   const statusEl = document.getElementById('wiz-files-status');
   statusEl.style.color = 'var(--text-secondary)';
@@ -380,11 +470,13 @@ function updateDashboardUI(data) {
   cpuBar.style.width  = Math.min(cpu, 100) + '%';
   cpuBar.className    = 'progress-fill' + (cpu > 80 ? ' danger' : cpu > 60 ? ' warn' : '');
 
-  // RAM
-  const memUsed  = Math.round(data.memory?.used  || 0);
-  const memLimit = data.memory?.limit || 2048;
-  const memPct   = Math.round((memUsed / memLimit) * 100);
-  setText('ram-value', `${memUsed} / ${memLimit} MB`);
+  // RAM — display in GB
+  const memUsedMB  = Math.round(data.memory?.used  || 0);
+  const memLimitMB = data.memory?.limit || 2048;
+  const memPct     = Math.round((memUsedMB / memLimitMB) * 100);
+  const memUsedGB  = (memUsedMB  / 1024).toFixed(1);
+  const memLimitGB = (memLimitMB / 1024).toFixed(1);
+  setText('ram-value', `${memUsedGB} / ${memLimitGB} GB`);
   const ramBar = document.getElementById('ram-bar');
   ramBar.style.width = Math.min(memPct, 100) + '%';
   ramBar.className   = 'progress-fill' + (memPct > 80 ? ' danger' : memPct > 60 ? ' warn' : '');
@@ -813,6 +905,9 @@ async function loadConfig() {
   container.innerHTML = '';
 
   for (const group of data.groups) {
+    // VNC & Display settings are rendered inside the VNC panel card below
+    if (group.name === 'VNC & Display') continue;
+
     const card = document.createElement('div');
     card.className = 'card config-group';
     card.innerHTML = `<div class="config-group-title">${escapeHtml(group.name)}</div>`;
@@ -828,9 +923,13 @@ async function loadConfig() {
         const checked = item.value === 'true' ? 'checked' : '';
         valueHtml = `<label class="toggle"><input type="checkbox" data-key="${item.key}" ${checked} onchange="configChanged()"><span class="toggle-slider"></span></label>`;
       } else if (item.options?.length) {
-        valueHtml = `<select class="input" data-key="${item.key}" style="width:220px" onchange="configChanged()">` +
-          item.options.map(o => `<option value="${escapeHtml(o)}"${o === (item.value || '') ? ' selected' : ''}>${escapeHtml(o || 'Auto-detect')}</option>`).join('') +
-          '</select>';
+        const opts = item.options.map(o => {
+          const val = typeof o === 'object' ? o.value : o;
+          const lbl = typeof o === 'object' ? o.label : (o || 'Auto-detect');
+          const sel = val === (item.value ?? '') ? ' selected' : '';
+          return `<option value="${escapeHtml(val)}"${sel}>${escapeHtml(lbl)}</option>`;
+        }).join('');
+        valueHtml = `<select class="input" data-key="${item.key}" style="width:220px" onchange="configChanged()">${opts}</select>`;
       } else if (item.viewable) {
         valueHtml = `<div class="password-wrapper">
           <input type="password" class="input" data-key="${item.key}" value="${escapeHtml(item.value || '')}"
@@ -896,39 +995,81 @@ async function saveConfig() {
 
 // ─── VNC ─────────────────────────────────────────────────────────
 async function loadVnc() {
-  const data  = await API.get('/api/vnc/status');
+  const [vnc, cfg] = await Promise.all([
+    API.get('/api/vnc/status'),
+    API.get('/api/config'),
+  ]);
   const panel = document.getElementById('vncPanel');
-  if (!panel || !data) return;
+  if (!panel) return;
+
+  const vncGroup = cfg?.groups?.find(g => g.name === 'VNC & Display');
+
+  // Build config rows for VNC & Display settings
+  let cfgRows = '';
+  if (vncGroup) {
+    for (const item of vncGroup.items) {
+      let ctrl = '';
+      if (item.type === 'boolean') {
+        const chk = item.value === 'true' ? 'checked' : '';
+        ctrl = `<label class="toggle"><input type="checkbox" data-key="${item.key}" ${chk} onchange="configChanged()"><span class="toggle-slider"></span></label>`;
+      } else if (item.options?.length) {
+        const opts = item.options.map(o => {
+          const val = typeof o === 'object' ? o.value : o;
+          const lbl = typeof o === 'object' ? o.label : o;
+          return `<option value="${escapeHtml(val)}"${val === (item.value ?? '') ? ' selected' : ''}>${escapeHtml(lbl)}</option>`;
+        }).join('');
+        ctrl = `<select class="input" data-key="${item.key}" style="width:180px" onchange="configChanged()">${opts}</select>`;
+      } else if (item.viewable) {
+        ctrl = `<div class="password-wrapper">
+          <input type="password" class="input" data-key="${item.key}" value="${escapeHtml(item.value || '')}"
+            placeholder="${escapeHtml(item.default || '')}"${item.maxLength ? ` maxlength="${item.maxLength}"` : ''}
+            style="width:150px" oninput="configChanged()">
+          <button type="button" class="password-toggle" onclick="togglePasswordVisibility(this)" title="Show password">
+            ${icon('eye','icon')}</button></div>`;
+      } else {
+        ctrl = `<input type="${item.type === 'number' ? 'number' : 'text'}" class="input" data-key="${item.key}"
+          value="${escapeHtml(item.value || '')}" placeholder="${escapeHtml(item.default || '')}"
+          style="width:150px" oninput="configChanged()">`;
+      }
+      cfgRows += `<div class="config-item">
+        <div>
+          <div class="config-label">${escapeHtml(item.label)}</div>
+          ${item.description ? `<div class="config-help">${escapeHtml(item.description)}</div>` : ''}
+        </div>
+        <div class="config-value">${ctrl}</div>
+      </div>`;
+    }
+  }
 
   panel.innerHTML = `
-    <div class="details-grid">
+    <div class="details-grid" style="margin-bottom:12px">
       <div class="detail-item">
-        <div class="detail-label">Status</div>
-        <div class="detail-value" style="color:${data.running ? 'var(--accent)' : 'var(--text-muted)'}">
-          ${data.running ? '● Running' : '○ Stopped'}
+        <div class="detail-label">Connection Status</div>
+        <div class="detail-value" style="color:${vnc?.running ? 'var(--accent)' : 'var(--text-muted)'}">
+          ${vnc?.running ? '● Running' : '○ Stopped'}
         </div>
       </div>
       <div class="detail-item">
-        <div class="detail-label">Port</div>
-        <div class="detail-value">${data.port || 5900}/TCP</div>
+        <div class="detail-label">VNC Port</div>
+        <div class="detail-value">${vnc?.port || 5900}/TCP</div>
       </div>
-      ${data.autoShutoffAt ? `<div class="detail-item">
-        <div class="detail-label">Auto-off at</div>
-        <div class="detail-value">${new Date(data.autoShutoffAt).toLocaleTimeString()}</div>
-      </div>` : ''}
     </div>
-    <div class="action-buttons" style="margin-top:12px">
-      ${data.running
-        ? `<button class="btn btn-sm" style="color:#ef4444;border-color:#ef4444" onclick="vncDisable()">Disable VNC</button>
-           <button class="btn btn-sm btn-primary" onclick="showVncPasswordForm()">Set One-Time Password</button>`
-        : `<button class="btn btn-sm btn-success" onclick="vncEnable()">Enable VNC</button>`}
+    <div class="action-buttons" style="margin-bottom:16px">
+      ${vnc?.running
+        ? `<button class="btn btn-sm" style="color:#ef4444;border-color:#ef4444" onclick="vncDisable()">Stop VNC</button>
+           <button class="btn btn-sm btn-primary" onclick="showVncPasswordForm()">One-Time Password</button>`
+        : `<button class="btn btn-sm btn-success" onclick="vncEnable()">Start VNC Now</button>`}
     </div>
-    <div id="vncPasswordForm" style="display:none;margin-top:12px">
+    <div id="vncPasswordForm" style="display:none;margin-bottom:16px">
       <div class="form-row">
         <input type="password" id="vncOtpInput" class="input" placeholder="One-time password (4–8 chars)" maxlength="8">
-        <button class="btn btn-primary btn-sm" onclick="setVncOneTimePassword()">Set Password</button>
+        <button class="btn btn-primary btn-sm" onclick="setVncOneTimePassword()">Set</button>
         <button class="btn btn-sm" onclick="document.getElementById('vncPasswordForm').style.display='none'">Cancel</button>
       </div>
+    </div>
+    <div class="config-group" style="margin-top:8px">${cfgRows}</div>
+    <div style="text-align:right;margin-top:10px">
+      <button class="btn btn-success btn-sm" id="saveConfigBtn" onclick="saveConfig()" style="display:none">Save Changes</button>
     </div>
   `;
 }
