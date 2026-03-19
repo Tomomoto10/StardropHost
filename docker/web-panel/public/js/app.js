@@ -90,10 +90,9 @@ async function wizScanGamePath() {
   }
 }
 
-let _steamAuthPollTimer    = null;
-let _steamDlPollTimer      = null;
-let _steamDlLogLines       = 0;
-let _steamDlGuardSubmitted = false; // true after user submits steamcmd Guard code
+let _steamAuthPollTimer = null;
+let _steamDlPollTimer   = null;
+let _steamDlLogLines    = 0;
 
 // Step A — initiate Steam login via steam-auth sidecar (this triggers the Guard email)
 async function wizSteamLogin() {
@@ -238,7 +237,7 @@ async function wizTriggerSteamDownload() {
       statusEl.style.color  = 'var(--accent)';
       statusEl.textContent  = '✅ Steam code accepted — starting game download…';
       // Advance to step 3 (download progress screen) and begin polling
-      _steamDlLogLines = 0; _steamDlGuardSubmitted = false; // reset for fresh download
+      _steamDlLogLines = 0;
       setTimeout(() => { wizGoToStep(3); wizPollDownloadProgress(); }, 1200);
     } else {
       statusEl.style.color = 'var(--accent-error)';
@@ -263,6 +262,29 @@ const _DL_STAGE_TXT = {
   hosting:       'Multiplayer enabled — proceeding to setup…',
   ready:         '✅ Game installed and server is ready!',
 };
+
+// Show a "← Back to Step 2" button below the step-3 log when a fatal error occurs.
+function _wizShowStep3BackBtn(msg) {
+  const logEl = document.getElementById('wiz-dl-log');
+  if (!logEl) return;
+  // Only add once
+  if (document.getElementById('wiz-dl-back-btn')) return;
+  const wrap = document.createElement('div');
+  wrap.style.cssText = 'margin-top:12px;display:flex;flex-direction:column;gap:8px;align-items:flex-start';
+  if (msg) {
+    const p = document.createElement('p');
+    p.style.cssText = 'font-size:12px;color:var(--accent-error,#ef4444);margin:0';
+    p.textContent = msg;
+    wrap.appendChild(p);
+  }
+  const btn = document.createElement('button');
+  btn.id = 'wiz-dl-back-btn';
+  btn.className = 'btn btn-secondary';
+  btn.textContent = '← Back to Step 2';
+  btn.onclick = () => { wizGoToStep(2); };
+  wrap.appendChild(btn);
+  logEl.parentElement.appendChild(wrap);
+}
 
 // Stream setup.log lines into the step-3 log box, starting from the first
 // "Steam credentials detected" line so earlier boot noise is excluded.
@@ -328,7 +350,9 @@ async function wizSubmitSteamcmdGuard() {
       if (bar) bar.style.width = '35%';
       // Reset log position so we start streaming from the new attempt
       _steamDlLogLines = 0;
-      _steamDlGuardSubmitted = true; // suppress old STEAM_GUARD_REQUIRED sentinel
+      // Remove any back button from a previous failed attempt
+      const oldBack = document.getElementById('wiz-dl-back-btn');
+      if (oldBack) oldBack.parentElement.remove();
       // Resume polling
       _steamDlPollTimer = setTimeout(wizPollDownloadProgress, 5000);
     } else {
@@ -374,16 +398,19 @@ async function wizPollDownloadProgress() {
     if (log?.lines?.length) {
       const allText = log.lines.map(l => l.text).join('\n');
 
-      // Detect steamcmd Guard requirement — show inline input, pause polling
-      // Skip if the user already submitted a code (sentinel persists in old log lines)
-      if (!_steamDlGuardSubmitted && /STEAM_GUARD_REQUIRED/i.test(allText)) {
+      // Detect steamcmd Guard requirement — show inline input, pause polling.
+      // Always show (even on retry) so the user can correct a wrong code.
+      if (/STEAM_GUARD_REQUIRED/i.test(allText)) {
         clearTimeout(_steamDlPollTimer);
         _steamDlPollTimer = null;
-        const guardRow = document.getElementById('wiz-dl-guard-row');
+        const guardRow  = document.getElementById('wiz-dl-guard-row');
+        const guardBtn  = document.getElementById('wiz-dl-guard-btn');
+        const guardStat = document.getElementById('wiz-dl-guard-status');
         if (guardRow) guardRow.style.display = '';
+        if (guardBtn) guardBtn.disabled = false;
+        if (guardStat) guardStat.textContent = '';
         if (lbl) { lbl.style.color = 'var(--accent-warning,#f59e0b)'; lbl.textContent = '⏳ Waiting for Steam Guard code…'; }
         if (bar) bar.style.width = '30%';
-        // Still stream whatever logs we have, then stop
         _wizStreamLogs(log.lines, logEl, cntEl);
         return;
       }
@@ -391,21 +418,24 @@ async function wizPollDownloadProgress() {
       if (/STEAM_WRONG_PASSWORD/i.test(allText)) {
         clearTimeout(_steamDlPollTimer);
         _steamDlPollTimer = null;
-        if (lbl) { lbl.style.color = 'var(--accent-error,#ef4444)'; lbl.textContent = '❌ Wrong password — go back to Step 2 and re-enter your credentials.'; }
+        if (lbl) { lbl.style.color = 'var(--accent-error,#ef4444)'; lbl.textContent = '❌ Wrong password.'; }
+        _wizShowStep3BackBtn('Wrong Steam password — go back and re-enter your credentials.');
         return;
       }
 
       if (/STEAM_RATE_LIMIT/i.test(allText)) {
         clearTimeout(_steamDlPollTimer);
         _steamDlPollTimer = null;
-        if (lbl) { lbl.style.color = 'var(--accent-error,#ef4444)'; lbl.textContent = '❌ Steam rate limit — wait a few minutes, then go back to Step 2 and retry.'; }
+        if (lbl) { lbl.style.color = 'var(--accent-error,#ef4444)'; lbl.textContent = '❌ Steam rate limit.'; }
+        _wizShowStep3BackBtn('Steam has rate-limited this login. Wait a few minutes, then go back and retry.');
         return;
       }
 
       if (/STEAM_DOWNLOAD_FAILED|waiting for new credentials/i.test(allText)) {
         clearTimeout(_steamDlPollTimer);
         _steamDlPollTimer = null;
-        if (lbl) { lbl.style.color = 'var(--accent-error,#ef4444)'; lbl.textContent = '❌ Download failed — go back to Step 2 and try again.'; }
+        if (lbl) { lbl.style.color = 'var(--accent-error,#ef4444)'; lbl.textContent = '❌ Download failed.'; }
+        _wizShowStep3BackBtn('Download failed — go back to Step 2 and check your credentials.');
         return;
       }
 
