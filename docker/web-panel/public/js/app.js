@@ -171,19 +171,42 @@ async function wizPollSteamDownload() {
         logEl.scrollTop = logEl.scrollHeight;
         _steamDlLogLines = log.lines.length;
 
-        // Detect Steam Guard prompt in log
+        // Match the specific sentinel messages written by download_game_via_steam()
         const allText = log.lines.map(l => l.text).join('\n');
-        if (/steam guard|two-factor|2fa|enter.*code/i.test(allText) && statusEl) {
-          statusEl.style.color = 'var(--accent-warning,#f59e0b)';
-          statusEl.textContent = '⚠️ Steam Guard required — enter your code above and click the button again.';
-          if (btn) { btn.disabled = false; btn.textContent = 'Submit Guard Code & Retry'; }
-        }
 
-        // Detect login failure
-        if (/invalid password|login failure|rate limit/i.test(allText)) {
+        if (/STEAM_GUARD_REQUIRED/i.test(allText)) {
+          // Guard code needed — stop loop, let user enter code and re-click
           clearInterval(_steamDlPollTimer);
-          statusEl.style.color = 'var(--accent-error)';
-          statusEl.textContent = '❌ Steam login failed — check your credentials and try again.';
+          _steamDlPollTimer = null;
+          if (statusEl) {
+            statusEl.style.color = 'var(--accent-warning,#f59e0b)';
+            statusEl.textContent = '⚠️ Steam Guard code required — enter the code from your email or authenticator above, then click the button.';
+          }
+          if (btn) { btn.disabled = false; btn.textContent = 'Submit Guard Code & Download'; }
+        } else if (/STEAM_WRONG_PASSWORD/i.test(allText)) {
+          clearInterval(_steamDlPollTimer);
+          _steamDlPollTimer = null;
+          if (statusEl) {
+            statusEl.style.color = 'var(--accent-error)';
+            statusEl.textContent = '❌ Invalid password — check your Steam credentials and try again.';
+          }
+          if (btn) { btn.disabled = false; btn.textContent = 'Login & Download Game'; }
+        } else if (/STEAM_RATE_LIMIT/i.test(allText)) {
+          clearInterval(_steamDlPollTimer);
+          _steamDlPollTimer = null;
+          if (statusEl) {
+            statusEl.style.color = 'var(--accent-warning,#f59e0b)';
+            statusEl.textContent = '⚠️ Steam rate limit — wait a few minutes, then try again.';
+          }
+          if (btn) { btn.disabled = false; btn.textContent = 'Login & Download Game'; }
+        } else if (/STEAM_DOWNLOAD_FAILED|waiting for new credentials/i.test(allText)) {
+          // Generic failure — stop loop, let user retry
+          clearInterval(_steamDlPollTimer);
+          _steamDlPollTimer = null;
+          if (statusEl) {
+            statusEl.style.color = 'var(--accent-error)';
+            statusEl.textContent = '❌ Download failed — check your credentials and try again.';
+          }
           if (btn) { btn.disabled = false; btn.textContent = 'Login & Download Game'; }
         }
       }

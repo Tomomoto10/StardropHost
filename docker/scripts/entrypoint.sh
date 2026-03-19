@@ -186,23 +186,27 @@ setup_game_files() {
 # -- Steam download --
 download_game_via_steam() {
     log_info "Starting Steam download..."
-    log_info "Steam credentials are handled via the web UI"
-    log_info "This may take 5-10 minutes depending on your connection"
+    log_info "This may take 5-15 minutes depending on your connection"
 
-    STEAM_GUARD_ARGS=""
-    if [ -n "$STEAM_GUARD_CODE" ]; then
-        log_info "Using Steam Guard code from session"
-        STEAM_GUARD_ARGS="+set_steam_guard_code $STEAM_GUARD_CODE"
+    local STEAMCMD_LOG="/tmp/steamcmd_out.log"
+
+    # Build args array so spaces in values are handled correctly
+    local STEAMCMD_ARGS=(
+        +force_install_dir /home/steam/stardewvalley
+    )
+    if [ -n "${STEAM_GUARD_CODE:-}" ]; then
+        log_info "Using Steam Guard code"
+        STEAMCMD_ARGS+=(+set_steam_guard_code "$STEAM_GUARD_CODE")
     fi
-
-    /home/steam/steamcmd/steamcmd.sh \
-        +force_install_dir /home/steam/stardewvalley \
-        $STEAM_GUARD_ARGS \
-        +login "$STEAM_USERNAME" "$STEAM_PASSWORD" \
-        +app_update 413150 validate \
+    STEAMCMD_ARGS+=(
+        +login "$STEAM_USERNAME" "$STEAM_PASSWORD"
+        +app_update 413150 validate
         +quit
+    )
 
-    local result=$?
+    # Tee steamcmd output so it appears in container logs AND in a temp file
+    # we can grep for specific error conditions
+    /home/steam/steamcmd/steamcmd.sh "${STEAMCMD_ARGS[@]}" 2>&1 | tee "$STEAMCMD_LOG"
 
     # Always clear credentials from env file after attempt — never persist them
     ENV_FILE="${ENV_FILE:-/home/steam/web-panel/data/runtime.env}"
@@ -215,16 +219,27 @@ download_game_via_steam() {
 
     if [ -f "/home/steam/stardewvalley/StardewValley" ]; then
         log_info "✅ Game downloaded successfully"
-        # Also clear STEAM_DOWNLOAD flag so it doesn't re-download on next start
         if [ -f "$ENV_FILE" ]; then
             sed -i '/^STEAM_DOWNLOAD=/d' "$ENV_FILE" 2>/dev/null || true
         fi
+        rm -f "$STEAMCMD_LOG"
         return 0
-    else
-        log_error "❌ Game download failed"
-        log_error "Check your Steam credentials and try again via the web UI"
-        return 1
     fi
+
+    # Inspect steamcmd output to give the user a specific reason
+    if grep -qi "steam guard\|steamguard\|two-factor\|enter.*code\|Invalid Login AuthCode\|STEAM_GUARD_CODE" "$STEAMCMD_LOG" 2>/dev/null; then
+        log_warn "⚠️  STEAM_GUARD_REQUIRED — enter the code from your email or authenticator app"
+        log_warn "    Enter the code in the web panel and click 'Submit Guard Code & Download' to retry"
+    elif grep -qi "Invalid Password\|INVALID_PASSWORD\|incorrect password" "$STEAMCMD_LOG" 2>/dev/null; then
+        log_error "❌ STEAM_WRONG_PASSWORD — check your Steam username and password"
+    elif grep -qi "rate.limit\|too many\|RATE_LIMIT" "$STEAMCMD_LOG" 2>/dev/null; then
+        log_warn "⚠️  STEAM_RATE_LIMIT — Steam has rate-limited this login, wait a few minutes then retry"
+    else
+        log_error "❌ STEAM_DOWNLOAD_FAILED — download failed, check credentials and try again"
+    fi
+
+    rm -f "$STEAMCMD_LOG"
+    return 1
 }
 
 # -- GPU Xorg startup --
