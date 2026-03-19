@@ -71,14 +71,16 @@ USER steam
 # -- Download SteamCMD + SMAPI --
 RUN wget -qO- 'https://steamcdn-a.akamaihd.net/client/installer/steamcmd_linux.tar.gz' | \
         tar zxf - -C /home/steam/steamcmd && \
-    wget -qO smapi.zip 'https://github.com/Pathoschild/SMAPI/releases/download/4.3.2/SMAPI-4.3.2-installer.zip' && \
+    wget -qO smapi.zip 'https://github.com/Pathoschild/SMAPI/releases/download/4.5.2/SMAPI-4.5.2-installer.zip' && \
     unzip -q smapi.zip -d smapi && \
     rm smapi.zip
 
-# -- Copy pre-built mods (AlwaysOnServer, AutoHideHost, ServerAutoLoad, SkillLevelGuard) --
+# -- Copy pre-built mods (AlwaysOnServer, AutoHideHost, SkillLevelGuard) --
+# Note: ServerAutoLoad removed — replaced by StardropGameManager source mod.
 USER root
 COPY mods/ /home/steam/preinstalled-mods/
-RUN chown -R steam:steam /home/steam/preinstalled-mods && \
+RUN rm -rf /home/steam/preinstalled-mods/ServerAutoLoad && \
+    chown -R steam:steam /home/steam/preinstalled-mods && \
     chmod -R 755 /home/steam/preinstalled-mods
 
 # -- Copy SMAPI mod sources + pre-restore NuGet packages --
@@ -86,11 +88,11 @@ RUN chown -R steam:steam /home/steam/preinstalled-mods && \
 # game files are mounted, because ModBuildConfig needs StardewValley.dll
 # which is only available at runtime, not at image build time.
 # Pre-restoring here caches NuGet packages so runtime builds work offline.
-COPY mods-source/ServerDashboard/  /home/steam/mod-source/ServerDashboard/
-COPY mods-source/FarmAutoCreate/   /home/steam/mod-source/FarmAutoCreate/
+COPY mods-source/ServerDashboard/       /home/steam/mod-source/ServerDashboard/
+COPY mods-source/StardropGameManager/   /home/steam/mod-source/StardropGameManager/
 RUN chown -R root:root /home/steam/mod-source && \
-    cd /home/steam/mod-source/ServerDashboard && dotnet restore 2>&1 || true && \
-    cd /home/steam/mod-source/FarmAutoCreate  && dotnet restore 2>&1 || true
+    cd /home/steam/mod-source/ServerDashboard     && dotnet restore 2>&1 || true && \
+    cd /home/steam/mod-source/StardropGameManager && dotnet restore 2>&1 || true
 USER steam
 
 # -- Copy scripts --

@@ -574,23 +574,75 @@ async function wizLoadFarmStep() {
   } catch {}
 }
 
+function wizPetToggle() {
+  const accept     = document.getElementById('wiz-accept-pet')?.value === 'true';
+  const detailsEl  = document.getElementById('wiz-pet-detail');
+  if (detailsEl) detailsEl.style.display = accept ? '' : 'none';
+}
+
+function wizPetBreedOptions() {
+  const species  = document.getElementById('wiz-pet-species')?.value || 'cat';
+  const breedSel = document.getElementById('wiz-pet-breed');
+  if (!breedSel) return;
+  const cats = ['Tabby (orange)', 'Black cat', 'Calico', 'Siamese', 'Grey'];
+  const dogs = ['Corgi', 'Pitbull', 'Poodle', 'Shiba Inu', 'Dalmatian'];
+  const breeds = species === 'dog' ? dogs : cats;
+  const current = breedSel.value;
+  breedSel.innerHTML = breeds.map((b, i) => `<option value="${i}">${b}</option>`).join('');
+  // Preserve selection if valid
+  const idx = parseInt(current, 10);
+  if (!isNaN(idx) && idx < 5) breedSel.value = String(idx);
+}
+
 async function wizCreateNewFarm() {
-  const statusEl  = document.getElementById('wiz-farm-status');
-  const farmName  = document.getElementById('wiz-farm-name')?.value?.trim()   || 'Stardrop Farm';
-  const farmerName= document.getElementById('wiz-farmer-name')?.value?.trim() || 'Host';
-  const farmType  = document.getElementById('wiz-farm-type')?.value   || '0';
-  const cabinCount= document.getElementById('wiz-cabin-count')?.value || '1';
-  const petType   = document.getElementById('wiz-pet-type')?.value    || 'cat';
+  const statusEl = document.getElementById('wiz-farm-status');
+
+  const val = id => document.getElementById(id)?.value ?? '';
+
+  const farmName     = val('wiz-farm-name').trim()    || 'Stardrop Farm';
+  const farmerName   = val('wiz-farmer-name').trim()  || 'Host';
+  const favoriteThing= val('wiz-favorite-thing').trim()|| 'Farming';
+  const farmType     = val('wiz-farm-type')   || '0';
+  const cabinCount   = val('wiz-cabin-count') || '1';
+  const cabinLayout  = val('wiz-cabin-layout')|| 'separate';
+  const moneyStyle   = val('wiz-money-style') || 'shared';
+  const profitMargin = val('wiz-profit-margin')|| 'normal';
+  const moveBuild    = val('wiz-move-build')  || 'off';
+  const ccBundles    = val('wiz-cc-bundles')  || 'normal';
+  const mineRewards  = val('wiz-mine-rewards')|| 'normal';
+  const monsters     = val('wiz-monsters')    || 'false';
+  const year1        = val('wiz-year1')       || 'false';
+  const randomSeed   = val('wiz-random-seed').trim();
+  const acceptPet    = val('wiz-accept-pet')  || 'true';
+  const petSpecies   = val('wiz-pet-species') || 'cat';
+  const petBreed     = val('wiz-pet-breed')   || '0';
+  const petName      = val('wiz-pet-name').trim() || 'Stella';
+  const cave         = val('wiz-cave')        || 'mushrooms';
+  const joja         = val('wiz-joja')        || 'false';
 
   statusEl.style.color = 'var(--text-secondary)';
   statusEl.textContent = 'Saving farm configuration…';
   try {
-    await API.post('/api/wizard/new-farm', { farmName, farmerName, farmType, cabinCount, petType });
+    await API.post('/api/wizard/new-farm', {
+      farmName, farmerName, favoriteThing,
+      farmType, cabinCount, cabinLayout,
+      moneyStyle, profitMargin, moveBuildPermission: moveBuild,
+      communityCenterBundles: ccBundles, mineRewards,
+      spawnMonstersAtNight: monsters === 'true',
+      guaranteeYear1Completable: year1 === 'true',
+      randomSeed: randomSeed !== '' ? randomSeed : null,
+      acceptPet: acceptPet === 'true',
+      petSpecies, petBreed: parseInt(petBreed, 10) || 0, petName,
+      mushroomsOrBats: cave,
+      purchaseJojaMembership: joja === 'true',
+    });
     statusEl.style.color = 'var(--accent)';
     statusEl.textContent = '✅ Farm config saved';
     _wizState._farmMode = 'new';
     _wizState._farmName = farmName;
-    document.getElementById('wiz-confirm-save').textContent = `✅ New farm: "${farmName}" (${['Standard','Riverland','Forest','Hill-top','Wilderness','Four Corners','Beach'][farmType]})`;
+    const typeNames = ['Standard','Riverland','Forest','Hill-top','Wilderness','Four Corners','Beach'];
+    document.getElementById('wiz-confirm-save').textContent =
+      `✅ New farm: "${farmName}" (${typeNames[parseInt(farmType,10)] || 'Standard'})`;
     setTimeout(() => wizLaunchServer(), 800);
   } catch (e) {
     statusEl.style.color = 'var(--accent-error)';

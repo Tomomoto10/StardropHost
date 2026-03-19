@@ -778,17 +778,29 @@
 
         <!-- New farm fields -->
         <div id="wiz-farm-new" style="display:none">
-          <div style="display:grid;gap:12px">
-            <div>
-              <label style="font-size:13px;color:var(--text-secondary);display:block;margin-bottom:5px">Farm Name</label>
-              <input id="wiz-farm-name" class="input" type="text" value="Stardrop Farm" style="width:100%">
+          <div style="display:grid;gap:10px">
+
+            <!-- Identity -->
+            <div style="font-size:11px;font-weight:600;color:var(--accent);text-transform:uppercase;letter-spacing:.06em;margin-top:2px">Farm &amp; Host</div>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+              <div>
+                <label style="font-size:12px;color:var(--text-secondary);display:block;margin-bottom:4px">Farm Name</label>
+                <input id="wiz-farm-name" class="input" type="text" value="Stardrop Farm" style="width:100%">
+              </div>
+              <div>
+                <label style="font-size:12px;color:var(--text-secondary);display:block;margin-bottom:4px">Farmer Name <span style="color:var(--text-muted)">(host bot)</span></label>
+                <input id="wiz-farmer-name" class="input" type="text" value="Host" style="width:100%">
+              </div>
             </div>
             <div>
-              <label style="font-size:13px;color:var(--text-secondary);display:block;margin-bottom:5px">Farmer Name <span style="color:var(--text-muted)">(host — not visible to players)</span></label>
-              <input id="wiz-farmer-name" class="input" type="text" value="Host" style="width:100%">
+              <label style="font-size:12px;color:var(--text-secondary);display:block;margin-bottom:4px">Favorite Thing <span style="color:var(--text-muted)">(host — appears in secret notes)</span></label>
+              <input id="wiz-favorite-thing" class="input" type="text" value="Farming" style="width:100%">
             </div>
+
+            <!-- Farm layout -->
+            <div style="font-size:11px;font-weight:600;color:var(--accent);text-transform:uppercase;letter-spacing:.06em;margin-top:4px">Farm</div>
             <div>
-              <label style="font-size:13px;color:var(--text-secondary);display:block;margin-bottom:5px">Farm Type</label>
+              <label style="font-size:12px;color:var(--text-secondary);display:block;margin-bottom:4px">Farm Type</label>
               <select id="wiz-farm-type" class="input" style="width:100%">
                 <option value="0">Standard — balanced, good for beginners</option>
                 <option value="1">Riverland — lots of water, great for fishing</option>
@@ -796,27 +808,150 @@
                 <option value="3">Hill-top — mining resources on the farm</option>
                 <option value="4">Wilderness — monsters spawn at night</option>
                 <option value="5">Four Corners — one of each area</option>
-                <option value="6">Beach — sandy, hard to irrigate but unique</option>
+                <option value="6">Beach — sandy, unique irrigation challenge</option>
               </select>
             </div>
-            <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
               <div>
-                <label style="font-size:13px;color:var(--text-secondary);display:block;margin-bottom:5px">Cabins (max players - 1)</label>
+                <label style="font-size:12px;color:var(--text-secondary);display:block;margin-bottom:4px">Starting Cabins</label>
                 <select id="wiz-cabin-count" class="input" style="width:100%">
-                  <option value="0">0 — solo only</option>
-                  <option value="1" selected>1 cabin</option>
-                  <option value="2">2 cabins</option>
-                  <option value="3">3 cabins</option>
+                  <option value="1">1 cabin (2 players)</option>
+                  <option value="2">2 cabins (3 players)</option>
+                  <option value="3" selected>3 cabins (4 players)</option>
+                  <option value="4">4 cabins (5 players)</option>
                 </select>
               </div>
               <div>
-                <label style="font-size:13px;color:var(--text-secondary);display:block;margin-bottom:5px">Pet</label>
-                <select id="wiz-pet-type" class="input" style="width:100%">
-                  <option value="cat">Cat</option>
+                <label style="font-size:12px;color:var(--text-secondary);display:block;margin-bottom:4px">Cabin Layout</label>
+                <select id="wiz-cabin-layout" class="input" style="width:100%">
+                  <option value="separate" selected>Separate — spread around farm</option>
+                  <option value="nearby">Nearby — clustered together</option>
+                </select>
+              </div>
+            </div>
+
+            <!-- Economy -->
+            <div style="font-size:11px;font-weight:600;color:var(--accent);text-transform:uppercase;letter-spacing:.06em;margin-top:4px">Economy</div>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+              <div>
+                <label style="font-size:12px;color:var(--text-secondary);display:block;margin-bottom:4px">Money Style</label>
+                <select id="wiz-money-style" class="input" style="width:100%">
+                  <option value="shared" selected>Shared wallet</option>
+                  <option value="separate">Separate wallets</option>
+                </select>
+              </div>
+              <div>
+                <label style="font-size:12px;color:var(--text-secondary);display:block;margin-bottom:4px">Profit Margin</label>
+                <select id="wiz-profit-margin" class="input" style="width:100%">
+                  <option value="normal" selected>Normal (100%)</option>
+                  <option value="75%">75%</option>
+                  <option value="50%">50%</option>
+                  <option value="25%">25%</option>
+                </select>
+              </div>
+            </div>
+            <div>
+              <label style="font-size:12px;color:var(--text-secondary);display:block;margin-bottom:4px">Move Build Permission <span style="color:var(--text-muted)">(farmhands moving buildings)</span></label>
+              <select id="wiz-move-build" class="input" style="width:100%">
+                <option value="off" selected>Off — only host can move buildings</option>
+                <option value="owned">Owned — farmhands move their own buildings</option>
+                <option value="on">On — all farmhands can move any building</option>
+              </select>
+            </div>
+
+            <!-- World options -->
+            <div style="font-size:11px;font-weight:600;color:var(--accent);text-transform:uppercase;letter-spacing:.06em;margin-top:4px">World</div>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+              <div>
+                <label style="font-size:12px;color:var(--text-secondary);display:block;margin-bottom:4px">Community Center Bundles</label>
+                <select id="wiz-cc-bundles" class="input" style="width:100%">
+                  <option value="normal" selected>Normal</option>
+                  <option value="remixed">Remixed</option>
+                </select>
+              </div>
+              <div>
+                <label style="font-size:12px;color:var(--text-secondary);display:block;margin-bottom:4px">Mine Rewards</label>
+                <select id="wiz-mine-rewards" class="input" style="width:100%">
+                  <option value="normal" selected>Normal</option>
+                  <option value="remixed">Remixed</option>
+                </select>
+              </div>
+            </div>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+              <div>
+                <label style="font-size:12px;color:var(--text-secondary);display:block;margin-bottom:4px">Monsters on Farm at Night</label>
+                <select id="wiz-monsters" class="input" style="width:100%">
+                  <option value="false" selected>No — peaceful farm</option>
+                  <option value="true">Yes — wilderness mode</option>
+                </select>
+              </div>
+              <div>
+                <label style="font-size:12px;color:var(--text-secondary);display:block;margin-bottom:4px">Guarantee Year 1 Completable</label>
+                <select id="wiz-year1" class="input" style="width:100%">
+                  <option value="false" selected>No</option>
+                  <option value="true">Yes</option>
+                </select>
+              </div>
+            </div>
+            <div>
+              <label style="font-size:12px;color:var(--text-secondary);display:block;margin-bottom:4px">Random Seed <span style="color:var(--text-muted)">(optional — leave blank for random)</span></label>
+              <input id="wiz-random-seed" class="input" type="number" placeholder="Leave blank for random" style="width:100%">
+            </div>
+
+            <!-- Pet -->
+            <div style="font-size:11px;font-weight:600;color:var(--accent);text-transform:uppercase;letter-spacing:.06em;margin-top:4px">Pet</div>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+              <div>
+                <label style="font-size:12px;color:var(--text-secondary);display:block;margin-bottom:4px">Accept Pet</label>
+                <select id="wiz-accept-pet" class="input" style="width:100%" onchange="wizPetToggle()">
+                  <option value="true" selected>Yes — accept pet</option>
+                  <option value="false">No — decline pet</option>
+                </select>
+              </div>
+              <div>
+                <label style="font-size:12px;color:var(--text-secondary);display:block;margin-bottom:4px">Pet Species</label>
+                <select id="wiz-pet-species" class="input" style="width:100%" onchange="wizPetBreedOptions()">
+                  <option value="cat" selected>Cat</option>
                   <option value="dog">Dog</option>
                 </select>
               </div>
             </div>
+            <div id="wiz-pet-detail" style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+              <div>
+                <label style="font-size:12px;color:var(--text-secondary);display:block;margin-bottom:4px">Breed</label>
+                <select id="wiz-pet-breed" class="input" style="width:100%">
+                  <option value="0">Breed 1</option>
+                  <option value="1">Breed 2</option>
+                  <option value="2">Breed 3</option>
+                  <option value="3">Breed 4</option>
+                  <option value="4">Breed 5</option>
+                </select>
+              </div>
+              <div>
+                <label style="font-size:12px;color:var(--text-secondary);display:block;margin-bottom:4px">Pet Name</label>
+                <input id="wiz-pet-name" class="input" type="text" value="Stella" style="width:100%">
+              </div>
+            </div>
+
+            <!-- Cave & advanced -->
+            <div style="font-size:11px;font-weight:600;color:var(--accent);text-transform:uppercase;letter-spacing:.06em;margin-top:4px">Cave &amp; Advanced</div>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+              <div>
+                <label style="font-size:12px;color:var(--text-secondary);display:block;margin-bottom:4px">Cave Choice</label>
+                <select id="wiz-cave" class="input" style="width:100%">
+                  <option value="mushrooms" selected>Mushrooms</option>
+                  <option value="bats">Bats (fruit)</option>
+                </select>
+              </div>
+              <div>
+                <label style="font-size:12px;color:var(--text-secondary);display:block;margin-bottom:4px">Joja Membership</label>
+                <select id="wiz-joja" class="input" style="width:100%">
+                  <option value="false" selected>No — Community Center route</option>
+                  <option value="true">Yes — Joja route</option>
+                </select>
+              </div>
+            </div>
+
           </div>
           <button class="btn btn-success" style="width:100%;margin-top:16px" onclick="wizCreateNewFarm()">Save Farm Config →</button>
           <div id="wiz-farm-status" style="font-size:12px;color:var(--text-muted);text-align:center;margin-top:8px;min-height:16px"></div>

@@ -1,0 +1,11 @@
+{
+  "Name": "StardropGameManager",
+  "Author": "StardropHost",
+  "Version": "1.0.0",
+  "Description": "Headless co-op startup orchestrator. Loads the most recent save as co-op host, or creates a new native co-op farm from new-farm.json. Replaces FarmAutoCreate + ServerAutoLoad.",
+  "UniqueID": "stardrop.StardropGameManager",
+  "EntryDll": "StardropGameManager.dll",
+  "MinimumApiVersion": "4.0.0",
+  "MinimumGameVersion": "1.6.0",
+  "UpdateKeys": []
+}

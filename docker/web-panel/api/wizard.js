@@ -322,27 +322,71 @@ function submitStep5(req, res) {
   });
 }
 
-// New farm setup — stores params for create-farm.sh
+// New farm setup — writes new-farm.json consumed by StardropGameManager SMAPI mod
 function submitNewFarm(req, res) {
-  const { farmName, farmerName, farmType, cabinCount, petType } = req.body || {};
-  const FARM_TYPES = ['Standard', 'Riverland', 'Forest', 'Hill-top', 'Wilderness', 'Four Corners', 'Beach'];
-  const ft = parseInt(farmType ?? '0', 10);
+  const body = req.body || {};
+
+  // ── Farm type ──
+  const ft = parseInt(body.farmType ?? '0', 10);
   if (isNaN(ft) || ft < 0 || ft > 6) {
     return res.status(400).json({ error: 'farmType must be 0–6' });
   }
-  const cc = parseInt(cabinCount ?? '1', 10);
-  if (isNaN(cc) || cc < 0 || cc > 3) {
-    return res.status(400).json({ error: 'cabinCount must be 0–3' });
+
+  // ── Cabin count (1–4; mod caps at 3 internally) ──
+  const cc = parseInt(body.cabinCount ?? '1', 10);
+  if (isNaN(cc) || cc < 1 || cc > 4) {
+    return res.status(400).json({ error: 'cabinCount must be 1–4' });
   }
+
+  // ── Pet breed ──
+  const petBreed = Math.min(Math.max(parseInt(body.petBreed ?? '0', 10) || 0, 0), 4);
+
+  // ── Random seed (optional, must be a non-negative integer if supplied) ──
+  let randomSeed = null;
+  if (body.randomSeed !== null && body.randomSeed !== undefined && body.randomSeed !== '') {
+    const seed = parseInt(body.randomSeed, 10);
+    if (isNaN(seed) || seed < 0) {
+      return res.status(400).json({ error: 'randomSeed must be a non-negative integer' });
+    }
+    randomSeed = seed;
+  }
+
   const farmConfig = {
-    farmName:    (farmName   || 'Stardrop Farm').trim(),
-    farmerName:  (farmerName || 'Host').trim(),
-    farmType:    ft,
-    farmTypeName: FARM_TYPES[ft],
-    cabinCount:  cc,
-    petType:     petType === 'dog' ? 'dog' : 'cat',
-    createdAt:   new Date().toISOString(),
+    // Identity
+    FarmName:     (body.farmName    || 'Stardrop Farm').trim(),
+    FarmerName:   (body.farmerName  || 'Host').trim(),
+    FavoriteThing:(body.favoriteThing || 'Farming').trim(),
+
+    // Farm layout
+    FarmType:     ft,
+    CabinCount:   cc,
+    CabinLayout:  body.cabinLayout === 'nearby' ? 'nearby' : 'separate',
+
+    // Economy
+    MoneyStyle:   body.moneyStyle === 'separate' ? 'separate' : 'shared',
+    ProfitMargin: ['75%','50%','25%'].includes(body.profitMargin) ? body.profitMargin : 'normal',
+
+    // World generation
+    CommunityCenterBundles:   body.communityCenterBundles === 'remixed' ? 'remixed' : 'normal',
+    GuaranteeYear1Completable: body.guaranteeYear1Completable === true || body.guaranteeYear1Completable === 'true',
+    MineRewards:  body.mineRewards === 'remixed' ? 'remixed' : 'normal',
+    SpawnMonstersAtNight: body.spawnMonstersAtNight === true || body.spawnMonstersAtNight === 'true',
+    ...(randomSeed !== null && { RandomSeed: randomSeed }),
+
+    // Pet
+    AcceptPet:    body.acceptPet !== false && body.acceptPet !== 'false',
+    PetSpecies:   body.petSpecies === 'dog' ? 'dog' : 'cat',
+    PetBreed:     petBreed,
+    PetName:      (body.petName || 'Stella').trim(),
+
+    // Cave & advanced
+    MushroomsOrBats:         body.mushroomsOrBats === 'bats' ? 'bats' : 'mushrooms',
+    PurchaseJojaMembership:  body.purchaseJojaMembership === true || body.purchaseJojaMembership === 'true',
+    MoveBuildPermission:     ['owned','on'].includes(body.moveBuildPermission) ? body.moveBuildPermission : 'off',
+
+    createdAt: new Date().toISOString(),
   };
+
   try {
     const configPath = path.join(config.DATA_DIR, 'new-farm.json');
     const dir = path.dirname(configPath);
@@ -396,7 +440,7 @@ function getGameReadyStatus(req, res) {
     if (fs.existsSync(smapi)) {
       smapiLogExists = true;
       const content = fs.readFileSync(smapi, 'utf-8');
-      loaded  = /SAVE LOADED SUCCESSFULLY|Context: loaded save/i.test(content);
+      loaded  = /SAVE LOADED SUCCESSFULLY|Context: loaded save|Server ready for connections/i.test(content);
       hosting = /Starting LAN server|Auto [Mm]ode [Oo]n/i.test(content);
     }
   } catch {}

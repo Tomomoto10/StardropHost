@@ -429,37 +429,38 @@ else
     log_warn "⚠️  ServerDashboard source not found at $SD_SRC — skipping"
 fi
 
-# -- Step 3.6: Build FarmAutoCreate mod --
-# Headless new-farm creation: reads new-farm.json and uses Stardew's own
-# C# API to create the farm programmatically (no xdotool, no VNC needed).
-log_step "Step 3.6: Building FarmAutoCreate mod..."
+# -- Step 3.6: Build StardropGameManager mod --
+# Headless co-op startup orchestrator — replaces both FarmAutoCreate and ServerAutoLoad.
+# Loads the most recent save as co-op host, or creates a new native co-op farm from
+# new-farm.json using the CoopMenu.HostNewFarmSlot path (Steam invite codes work correctly).
+log_step "Step 3.6: Building StardropGameManager mod..."
 
-FAC_SRC="/home/steam/mod-source/FarmAutoCreate"
-FAC_DEST="/home/steam/preinstalled-mods/FarmAutoCreate"
+SGM_SRC="/home/steam/mod-source/StardropGameManager"
+SGM_DEST="/home/steam/preinstalled-mods/StardropGameManager"
 
-if [ -f "$FAC_DEST/FarmAutoCreate.dll" ]; then
-    log_info "✅ FarmAutoCreate already built"
-elif [ -d "$FAC_SRC" ]; then
-    log_info "Building FarmAutoCreate against game files..."
-    dotnet build "$FAC_SRC" -c Release \
+if [ -f "$SGM_DEST/StardropGameManager.dll" ]; then
+    log_info "✅ StardropGameManager already built"
+elif [ -d "$SGM_SRC" ]; then
+    log_info "Building StardropGameManager against game files..."
+    dotnet build "$SGM_SRC" -c Release \
         /p:GamePath=/home/steam/stardewvalley \
         /p:EnableModDeploy=false \
         /p:EnableModZip=false \
         2>&1
 
-    FAC_OUT="$FAC_SRC/bin/Release/net6.0"
-    if [ -f "$FAC_OUT/FarmAutoCreate.dll" ]; then
-        mkdir -p "$FAC_DEST"
-        cp "$FAC_OUT/FarmAutoCreate.dll" "$FAC_DEST/"
-        cp "$FAC_SRC/manifest.json"      "$FAC_DEST/"
-        chown -R steam:steam "$FAC_DEST" 2>/dev/null || true
-        log_info "✅ FarmAutoCreate built and staged"
+    SGM_OUT="$SGM_SRC/bin/Release/net6.0"
+    if [ -f "$SGM_OUT/StardropGameManager.dll" ]; then
+        mkdir -p "$SGM_DEST"
+        cp "$SGM_OUT/StardropGameManager.dll" "$SGM_DEST/"
+        cp "$SGM_SRC/manifest.json"           "$SGM_DEST/"
+        chown -R steam:steam "$SGM_DEST" 2>/dev/null || true
+        log_info "✅ StardropGameManager built and staged"
     else
-        log_warn "⚠️  FarmAutoCreate build failed — new farm wizard step won't auto-create"
-        log_warn "    You can still set up the farm manually once the game starts"
+        log_warn "⚠️  StardropGameManager build failed — server will not auto-load or create farms"
+        log_warn "    Check the build output above for C# compile errors"
     fi
 else
-    log_warn "⚠️  FarmAutoCreate source not found at $FAC_SRC — skipping"
+    log_warn "⚠️  StardropGameManager source not found at $SGM_SRC — skipping"
 fi
 
 # -- Step 4: Install mods --
@@ -467,8 +468,14 @@ log_step "Step 4: Installing mods..."
 
 mkdir -p /home/steam/stardewvalley/Mods
 
+# Remove mods that have been replaced in this version, so stale DLLs
+# from a previous install on the volume-mounted game directory don't linger.
+rm -rf /home/steam/stardewvalley/Mods/FarmAutoCreate  2>/dev/null || true
+rm -rf /home/steam/stardewvalley/Mods/ServerAutoLoad   2>/dev/null || true
+
 if [ -d "/home/steam/preinstalled-mods" ]; then
-    if [ -d "/home/steam/stardewvalley/Mods/AutoHideHost" ]; then
+    if [ -d "/home/steam/stardewvalley/Mods/AutoHideHost" ] && \
+       [ -d "/home/steam/stardewvalley/Mods/StardropGameManager" ]; then
         log_info "✅ Mods already installed"
     else
         log_info "Installing mods..."
