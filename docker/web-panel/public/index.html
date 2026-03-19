@@ -613,6 +613,7 @@
         <div class="wiz-dot" data-step="4"></div>
         <div class="wiz-dot" data-step="5"></div>
         <div class="wiz-dot" data-step="6"></div>
+        <div class="wiz-dot" data-step="7"></div>
       </div>
 
       <!-- Step 2: Game files -->
@@ -644,6 +645,7 @@
         </div>
 
         <div id="wiz-method-steam" style="display:none">
+          <!-- Step A: credentials -->
           <div style="display:grid;gap:12px;margin-bottom:14px">
             <div>
               <label style="font-size:13px;color:var(--text-secondary);display:block;margin-bottom:5px">Steam Username</label>
@@ -653,15 +655,23 @@
               <label style="font-size:13px;color:var(--text-secondary);display:block;margin-bottom:5px">Steam Password</label>
               <input id="wiz-steam-pass" class="input" type="password" placeholder="Steam password" style="width:100%">
             </div>
-            <div>
-              <label style="font-size:13px;color:var(--text-secondary);display:block;margin-bottom:4px">
-                Steam Guard Code
-                <span style="font-weight:400;color:var(--text-muted)"> — leave blank on first attempt; check email/app if prompted</span>
-              </label>
-              <input id="wiz-steam-guard" class="input" type="text" placeholder="e.g. AB12C" style="width:100%;letter-spacing:0.1em">
+          </div>
+          <button id="wiz-steam-login-btn" class="btn btn-primary" style="width:100%;margin-bottom:14px" onclick="wizSteamLogin()">Login to Steam</button>
+
+          <!-- Step B: Guard code — hidden until Steam sends the email -->
+          <div id="wiz-steam-guard-row" style="display:none;margin-bottom:14px">
+            <label style="font-size:13px;color:var(--text-secondary);display:block;margin-bottom:5px">
+              Steam Guard Code
+              <span style="font-weight:400;color:var(--text-muted)"> — check your email or authenticator app</span>
+            </label>
+            <div style="display:flex;gap:8px">
+              <input id="wiz-steam-guard" class="input" type="text" placeholder="e.g. AB12C" style="flex:1;letter-spacing:0.1em" autocomplete="one-time-code">
+              <button id="wiz-steam-guard-btn" class="btn btn-primary" onclick="wizSubmitSteamGuard()">Submit Code</button>
             </div>
           </div>
+
           <div id="wiz-steam-status" style="font-size:13px;color:var(--text-muted);margin-bottom:10px;min-height:16px"></div>
+
           <!-- Live download log — shown once download starts -->
           <div id="wiz-steam-log-wrap" style="display:none;margin-bottom:12px">
             <div style="font-size:11px;color:var(--text-muted);margin-bottom:4px;display:flex;justify-content:space-between">
@@ -673,7 +683,6 @@
               max-height:180px;overflow-y:auto;color:var(--text-secondary);
             "><span style="opacity:0.5">Connecting to Steam…</span></div>
           </div>
-          <button id="wiz-steam-dl-btn" class="btn btn-primary" style="width:100%" onclick="wizStartSteamDownload()">Login &amp; Download Game</button>
         </div>
 
         <!-- Continue only shown for local/path methods; steam auto-advances -->
@@ -682,8 +691,30 @@
         </div>
       </div>
 
-      <!-- Step 3: Resources -->
+      <!-- Step 3: Download & Install Progress (Steam only — auto-advances when ready) -->
       <div id="wiz-step-3" class="wiz-step card" style="display:none">
+        <h3 style="margin-bottom:4px">Installing Game</h3>
+        <p style="font-size:13px;color:var(--text-secondary);margin-bottom:16px">Downloading and installing Stardew Valley. This may take 5–15 minutes.</p>
+        <div style="margin-bottom:16px">
+          <div class="progress-bar" style="height:8px;border-radius:4px">
+            <div class="progress-fill" id="wiz-dl-bar" style="width:5%;transition:width 0.8s"></div>
+          </div>
+          <div id="wiz-dl-status" style="font-size:12px;color:var(--text-muted);text-align:center;margin-top:6px">Connecting to Steam…</div>
+        </div>
+        <div>
+          <div style="font-size:11px;color:var(--text-muted);margin-bottom:4px;display:flex;justify-content:space-between">
+            <span>Installation log</span><span id="wiz-dl-log-count" style="opacity:0.6"></span>
+          </div>
+          <div id="wiz-dl-log" style="
+            background:var(--bg-primary);border:1px solid var(--border);border-radius:6px;
+            padding:8px 10px;font-family:monospace;font-size:10.5px;line-height:1.6;
+            max-height:260px;overflow-y:auto;color:var(--text-secondary);
+          "><span style="opacity:0.5">Waiting for download to start…</span></div>
+        </div>
+      </div>
+
+      <!-- Step 4: Resources -->
+      <div id="wiz-step-4" class="wiz-step card" style="display:none">
         <h3 style="margin-bottom:4px">Resource Limits <span style="font-size:12px;font-weight:400;color:var(--text-muted)">(optional)</span></h3>
         <p style="font-size:13px;color:var(--text-secondary);margin-bottom:20px">Limit how much CPU and RAM the server can use.</p>
         <div style="display:grid;gap:14px">
@@ -715,8 +746,8 @@
         </div>
       </div>
 
-      <!-- Step 4: Server settings -->
-      <div id="wiz-step-4" class="wiz-step card" style="display:none">
+      <!-- Step 5: Server settings -->
+      <div id="wiz-step-5" class="wiz-step card" style="display:none">
         <h3 style="margin-bottom:4px">Server Settings <span style="font-size:12px;font-weight:400;color:var(--text-muted)">(optional)</span></h3>
         <p style="font-size:13px;color:var(--text-secondary);margin-bottom:20px">Configure how players join your server.</p>
         <div style="display:grid;gap:14px">
@@ -736,8 +767,8 @@
         </div>
       </div>
 
-      <!-- Step 5: Farm Setup -->
-      <div id="wiz-step-5" class="wiz-step card" style="display:none">
+      <!-- Step 6: Farm Setup -->
+      <div id="wiz-step-6" class="wiz-step card" style="display:none">
         <h3 style="margin-bottom:4px">Farm Setup</h3>
         <p style="font-size:13px;color:var(--text-secondary);margin-bottom:16px">Create a new co-op farm, or load an existing save.</p>
 
@@ -805,8 +836,8 @@
         </div>
       </div>
 
-      <!-- Step 6: Launch & Wait -->
-      <div id="wiz-step-6" class="wiz-step card" style="display:none">
+      <!-- Step 7: Launch & Wait -->
+      <div id="wiz-step-7" class="wiz-step card" style="display:none">
         <h3 style="margin-bottom:4px">Starting Server</h3>
         <p style="font-size:13px;color:var(--text-secondary);margin-bottom:16px">The server is starting. Please wait while the game loads.</p>
         <div style="background:var(--bg-tertiary);border-radius:8px;padding:14px;margin-bottom:16px;font-size:13px;color:var(--text-secondary);line-height:1.7">
