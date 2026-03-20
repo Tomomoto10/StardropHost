@@ -145,6 +145,8 @@ app.get( '/api/wizard/smapi-log',    wizardAPI.getWizardSmapiLog);  // no auth â
 app.post('/api/wizard/force-complete', auth.verifyMiddleware, wizardAPI.forceComplete);
 app.post('/api/wizard/reset',         auth.verifyMiddleware, wizardAPI.resetWizard);
 app.post('/api/wizard/factory-reset', auth.verifyMiddleware, wizardAPI.factoryReset);
+app.get( '/api/wizard/scan-saves',    wizardAPI.scanSaveImport);
+app.post('/api/wizard/import-save',   wizardAPI.importSave);
 
 // -- Static files --
 app.use(express.static(path.join(__dirname, 'public')));

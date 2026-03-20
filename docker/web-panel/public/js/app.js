@@ -174,13 +174,11 @@ function wizGoToStep(n) {
   });
   _wizState.currentStep = n;
 
-  // After factory reset: auto-select "Copy Manually" since game files already exist
+  // Step 2: auto-check game files on entry
   if (n === 2) {
     const hint = sessionStorage.getItem('wizardHint');
-    if (hint === 'local') {
-      sessionStorage.removeItem('wizardHint');
-      wizSetMethod('local');
-    }
+    if (hint === 'local') sessionStorage.removeItem('wizardHint');
+    wizCheckGameFiles();
   }
 
   // Ensure timezone picker is built when step 5 is shown (handles refresh mid-wizard)
@@ -638,7 +636,8 @@ async function wizPollDownloadProgress() {
 }
 
 async function wizCheckGameFiles() {
-  const statusEl = document.getElementById('wiz-files-status');
+  const statusEl   = document.getElementById('wiz-files-status');
+  const choiceDiv  = document.getElementById('wiz-method-choice');
   statusEl.style.color = 'var(--text-secondary)';
   statusEl.textContent = 'Checking…';
   try {
@@ -647,14 +646,65 @@ async function wizCheckGameFiles() {
       statusEl.style.color = 'var(--accent)';
       statusEl.textContent = '✅ Game files found!';
       _wizState._filesFound = true;
+      if (choiceDiv) choiceDiv.style.display = 'none';
       document.getElementById('wiz-step2-next').disabled = false;
+      if (!_wizState._method) _wizState._method = 'local';
     } else {
       statusEl.style.color = 'var(--accent-error)';
-      statusEl.textContent = '❌ Game files not found yet. Copy them then try again.';
+      statusEl.textContent = '❌ Game files not found. Choose a method below to provide them.';
+      if (choiceDiv) choiceDiv.style.display = 'block';
     }
   } catch {
     statusEl.style.color = 'var(--accent-error)';
     statusEl.textContent = 'Check failed — try again.';
+    if (choiceDiv) choiceDiv.style.display = 'block';
+  }
+}
+
+async function wizScanImportDir() {
+  const dir      = document.getElementById('wiz-import-dir')?.value;
+  const statusEl = document.getElementById('wiz-import-status');
+  const resultsEl = document.getElementById('wiz-import-results');
+  if (!dir) return;
+  statusEl.style.color = 'var(--text-secondary)';
+  statusEl.textContent = 'Scanning…';
+  if (resultsEl) resultsEl.style.display = 'none';
+  try {
+    const data = await API.get(`/api/wizard/scan-saves?dir=${encodeURIComponent(dir)}`);
+    if (data?.saves?.length) {
+      statusEl.style.color = 'var(--accent)';
+      statusEl.textContent = `Found ${data.saves.length} save(s).`;
+      const sel = document.getElementById('wiz-import-save');
+      sel.innerHTML = data.saves.map(s =>
+        `<option value="${encodeURIComponent(s.path)}" data-name="${s.name}">${s.name}</option>`
+      ).join('');
+      if (resultsEl) resultsEl.style.display = 'block';
+    } else {
+      statusEl.style.color = 'var(--text-muted)';
+      statusEl.textContent = 'No Stardew Valley saves found in that directory.';
+    }
+  } catch (e) {
+    statusEl.style.color = 'var(--accent-error)';
+    statusEl.textContent = e.message || 'Scan failed.';
+  }
+}
+
+async function wizImportSave() {
+  const sel      = document.getElementById('wiz-import-save');
+  const statusEl = document.getElementById('wiz-import-status');
+  if (!sel?.value) return;
+  const savePath = decodeURIComponent(sel.value);
+  const saveName = sel.options[sel.selectedIndex]?.dataset?.name;
+  statusEl.style.color = 'var(--text-secondary)';
+  statusEl.textContent = `Importing "${saveName}"…`;
+  try {
+    await API.post('/api/wizard/import-save', { savePath, saveName });
+    statusEl.style.color = 'var(--accent)';
+    statusEl.textContent = `✅ "${saveName}" imported — select it in the next step.`;
+    document.getElementById('wiz-import-results').style.display = 'none';
+  } catch (e) {
+    statusEl.style.color = 'var(--accent-error)';
+    statusEl.textContent = e.message || 'Import failed.';
   }
 }
 

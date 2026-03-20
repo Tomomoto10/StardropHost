@@ -526,16 +526,10 @@ function factoryReset(_req, res) {
       }
     }
 
-    // Clear active save selection
+    // Clear active save selection marker
     try {
       const marker = path.join(savesDir, '.selected_save');
       if (fs.existsSync(marker)) fs.unlinkSync(marker);
-      const prefs = path.join(config.CONFIG_DIR, 'startup_preferences');
-      if (fs.existsSync(prefs)) {
-        const content = fs.readFileSync(prefs, 'utf-8')
-          .replace(/^saveFolderName\s*=.*$/m, 'saveFolderName=');
-        fs.writeFileSync(prefs, content, 'utf-8');
-      }
     } catch {}
 
     // Clear stale live-status so dashboard doesn't show old farm data
@@ -547,6 +541,50 @@ function factoryReset(_req, res) {
     res.json({ success: true });
   } catch (err) {
     res.status(500).json({ error: `Failed to reset: ${err.message}` });
+  }
+}
+
+// Scan a server directory for Stardew Valley save folders
+function scanSaveImport(req, res) {
+  const dir = req.query.dir;
+  if (!dir || typeof dir !== 'string') return res.status(400).json({ error: 'dir required' });
+
+  // Basic safety: reject obviously dangerous paths
+  const resolved = path.resolve(dir);
+  const BLOCKED = ['/', '/proc', '/sys', '/dev', '/run'];
+  if (BLOCKED.includes(resolved)) return res.status(400).json({ error: 'Directory not allowed' });
+
+  const saves = [];
+  function scan(d, depth) {
+    if (depth > 3 || !fs.existsSync(d)) return;
+    let entries;
+    try { entries = fs.readdirSync(d, { withFileTypes: true }); } catch { return; }
+    for (const e of entries) {
+      if (!e.isDirectory()) continue;
+      const full = path.join(d, e.name);
+      if (fs.existsSync(path.join(full, 'SaveGameInfo'))) {
+        saves.push({ name: e.name, path: full });
+      } else if (depth < 2) {
+        scan(full, depth + 1);
+      }
+    }
+  }
+  scan(resolved, 0);
+  res.json({ saves });
+}
+
+// Copy a save from a server path into the saves directory
+function importSave(req, res) {
+  const { savePath, saveName } = req.body || {};
+  if (!savePath || !saveName) return res.status(400).json({ error: 'savePath and saveName required' });
+
+  const dest = path.join(config.SAVES_DIR, saveName);
+  try {
+    if (!fs.existsSync(config.SAVES_DIR)) fs.mkdirSync(config.SAVES_DIR, { recursive: true });
+    fs.cpSync(savePath, dest, { recursive: true });
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
   }
 }
 
@@ -563,6 +601,8 @@ module.exports = {
   getGameReadyStatus,
   getWizardSmapiLog,
   forceComplete,
+  scanSaveImport,
+  importSave,
   resetWizard,
   factoryReset,
 };

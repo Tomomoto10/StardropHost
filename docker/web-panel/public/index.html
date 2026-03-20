@@ -634,59 +634,65 @@
       <!-- Step 2: Game files -->
       <div id="wiz-step-2" class="wiz-step card" style="display:none">
         <h3 style="margin-bottom:4px">Game Files</h3>
-        <p style="font-size:13px;color:var(--text-secondary);margin-bottom:20px">StardropHost needs your Stardew Valley game files. Choose how to provide them.</p>
+        <p style="font-size:13px;color:var(--text-secondary);margin-bottom:16px">StardropHost needs your Stardew Valley game files.</p>
 
-        <div style="display:flex;gap:8px;margin-bottom:20px">
-          <button class="btn btn-secondary wiz-method-btn" data-method="local" onclick="wizSetMethod('local')" style="flex:1">Copy Manually</button>
-          <button class="btn btn-secondary wiz-method-btn" data-method="steam" onclick="wizSetMethod('steam')" style="flex:1">Steam Download</button>
-        </div>
+        <!-- Check at top — auto-runs on step entry -->
+        <button class="btn btn-secondary" style="width:100%;margin-bottom:8px" onclick="wizCheckGameFiles()">Check for Game Files</button>
+        <div id="wiz-files-status" style="font-size:13px;text-align:center;min-height:20px;margin-bottom:12px"></div>
 
-        <div id="wiz-method-local" style="display:none">
-          <div style="margin-bottom:12px">
-            <label style="font-size:13px;color:var(--text-secondary);display:block;margin-bottom:6px">Option A — Scan an existing install on this server</label>
-            <div style="display:flex;gap:8px;margin-bottom:6px">
-              <input id="wiz-scan-path" class="input" type="text" placeholder="/path/to/Stardew Valley" style="flex:1">
-              <button class="btn btn-secondary" onclick="wizScanGamePath()">Scan</button>
-            </div>
-            <div id="wiz-scan-status" style="font-size:12px;color:var(--text-muted);min-height:16px"></div>
+        <!-- Method choice — shown only when game files are not found -->
+        <div id="wiz-method-choice" style="display:none">
+          <p style="font-size:13px;color:var(--text-secondary);margin-bottom:10px">Game files not found — choose how to provide them:</p>
+          <div style="display:flex;gap:8px;margin-bottom:16px">
+            <button class="btn btn-secondary wiz-method-btn" data-method="local" onclick="wizSetMethod('local')" style="flex:1">Copy Manually</button>
+            <button class="btn btn-secondary wiz-method-btn" data-method="steam" onclick="wizSetMethod('steam')" style="flex:1">Steam Download</button>
           </div>
-          <div class="card" style="background:var(--bg-tertiary);margin-bottom:12px">
-            <p style="font-size:13px;margin:0 0 8px;color:var(--text-secondary)">Option B — Copy files manually to this path on the server:</p>
-            <code id="wiz-game-path" style="display:block;font-size:12px;background:var(--bg-primary);padding:8px 10px;border-radius:6px;color:var(--accent);word-break:break-all"></code>
-            <p style="font-size:12px;color:var(--text-muted);margin:8px 0 0">On Windows the game is usually at <code>C:\Program Files (x86)\Steam\steamapps\common\Stardew Valley\</code></p>
-          </div>
-          <button class="btn btn-secondary" style="width:100%;margin-bottom:8px" onclick="wizCheckGameFiles()">Check for Game Files</button>
-          <div id="wiz-files-status" style="font-size:13px;text-align:center;min-height:20px"></div>
-        </div>
 
-        <div id="wiz-method-steam" style="display:none">
-          <!-- Step A: credentials -->
-          <div style="display:grid;gap:12px;margin-bottom:14px">
-            <div>
-              <label style="font-size:13px;color:var(--text-secondary);display:block;margin-bottom:5px">Steam Username</label>
-              <input id="wiz-steam-user" class="input" type="text" placeholder="your_steam_username" style="width:100%">
+          <div id="wiz-method-local" style="display:none">
+            <div style="margin-bottom:12px">
+              <label style="font-size:13px;color:var(--text-secondary);display:block;margin-bottom:6px">Option A — Scan an existing install on this server</label>
+              <div style="display:flex;gap:8px;margin-bottom:6px">
+                <input id="wiz-scan-path" class="input" type="text" placeholder="/path/to/Stardew Valley" style="flex:1">
+                <button class="btn btn-secondary" onclick="wizScanGamePath()">Scan</button>
+              </div>
+              <div id="wiz-scan-status" style="font-size:12px;color:var(--text-muted);min-height:16px"></div>
             </div>
-            <div>
-              <label style="font-size:13px;color:var(--text-secondary);display:block;margin-bottom:5px">Steam Password</label>
-              <input id="wiz-steam-pass" class="input" type="password" placeholder="Steam password" style="width:100%">
-            </div>
-          </div>
-          <button id="wiz-steam-login-btn" class="btn btn-primary" style="width:100%;margin-bottom:14px" onclick="wizSteamLogin()">Login to Steam</button>
-
-          <!-- Step B: Guard code — shown after Steam sends the email -->
-          <div id="wiz-steam-guard-row" style="display:none;margin-bottom:14px">
-            <label style="font-size:13px;color:var(--text-secondary);display:block;margin-bottom:5px">
-              Steam Guard Code
-              <span style="font-weight:400;color:var(--text-muted)"> — check your email or authenticator app</span>
-            </label>
-            <div style="display:flex;gap:8px">
-              <input id="wiz-steam-guard" class="input" type="text" placeholder="e.g. AB12C" style="flex:1;letter-spacing:0.1em" autocomplete="one-time-code">
-              <button id="wiz-steam-guard-btn" class="btn btn-primary" onclick="wizSubmitSteamGuard()">Submit Code</button>
+            <div class="card" style="background:var(--bg-tertiary);margin-bottom:8px">
+              <p style="font-size:13px;margin:0 0 8px;color:var(--text-secondary)">Option B — Copy files manually to this path on the server:</p>
+              <code id="wiz-game-path" style="display:block;font-size:12px;background:var(--bg-primary);padding:8px 10px;border-radius:6px;color:var(--accent);word-break:break-all"></code>
+              <p style="font-size:12px;color:var(--text-muted);margin:8px 0 0">On Windows the game is usually at <code>C:\Program Files (x86)\Steam\steamapps\common\Stardew Valley\</code></p>
             </div>
           </div>
 
-          <div id="wiz-steam-status" style="font-size:13px;color:var(--text-muted);margin-bottom:10px;min-height:16px"></div>
-        </div>
+          <div id="wiz-method-steam" style="display:none">
+            <!-- Step A: credentials -->
+            <div style="display:grid;gap:12px;margin-bottom:14px">
+              <div>
+                <label style="font-size:13px;color:var(--text-secondary);display:block;margin-bottom:5px">Steam Username</label>
+                <input id="wiz-steam-user" class="input" type="text" placeholder="your_steam_username" style="width:100%">
+              </div>
+              <div>
+                <label style="font-size:13px;color:var(--text-secondary);display:block;margin-bottom:5px">Steam Password</label>
+                <input id="wiz-steam-pass" class="input" type="password" placeholder="Steam password" style="width:100%">
+              </div>
+            </div>
+            <button id="wiz-steam-login-btn" class="btn btn-primary" style="width:100%;margin-bottom:14px" onclick="wizSteamLogin()">Login to Steam</button>
+
+            <!-- Step B: Guard code — shown after Steam sends the email -->
+            <div id="wiz-steam-guard-row" style="display:none;margin-bottom:14px">
+              <label style="font-size:13px;color:var(--text-secondary);display:block;margin-bottom:5px">
+                Steam Guard Code
+                <span style="font-weight:400;color:var(--text-muted)"> — check your email or authenticator app</span>
+              </label>
+              <div style="display:flex;gap:8px">
+                <input id="wiz-steam-guard" class="input" type="text" placeholder="e.g. AB12C" style="flex:1;letter-spacing:0.1em" autocomplete="one-time-code">
+                <button id="wiz-steam-guard-btn" class="btn btn-primary" onclick="wizSubmitSteamGuard()">Submit Code</button>
+              </div>
+            </div>
+
+            <div id="wiz-steam-status" style="font-size:13px;color:var(--text-muted);margin-bottom:10px;min-height:16px"></div>
+          </div>
+        </div><!-- /wiz-method-choice -->
 
         <!-- Continue only shown for local/path methods; steam auto-advances -->
         <div id="wiz-step2-continue-row" style="display:flex;justify-content:flex-end;margin-top:20px">
@@ -773,9 +779,23 @@
             <div id="wiz-tz-picker" class="tz-picker"></div>
           </div>
           <div>
-            <label style="font-size:13px;color:var(--text-secondary);display:block;margin-bottom:4px">Save File to Auto-Load <span style="color:var(--text-muted)">(required for LAN play)</span></label>
-            <p style="font-size:12px;color:var(--text-muted);margin:0 0 6px">Copy your save folder to <code style="font-size:11px">./data/saves/Saves/YourSaveName/</code> then enter the folder name here.</p>
-            <input id="wiz-save-name" class="input" type="text" placeholder="e.g. YourFarmName_123456789" style="width:100%">
+            <label style="font-size:13px;color:var(--text-secondary);display:block;margin-bottom:4px">Import Existing Save <span style="color:var(--text-muted)">(optional)</span></label>
+            <p style="font-size:12px;color:var(--text-muted);margin:0 0 8px">Scan a directory on this server to find and import an existing Stardew Valley save.</p>
+            <div style="display:flex;gap:8px;margin-bottom:6px">
+              <select id="wiz-import-dir" class="input" style="flex:1">
+                <option value="/home/steam">/home/steam</option>
+                <option value="/root">/root</option>
+                <option value="/home/user">/home/user</option>
+                <option value="/tmp">/tmp</option>
+                <option value="/mnt">/mnt</option>
+              </select>
+              <button class="btn btn-secondary" onclick="wizScanImportDir()">Scan</button>
+            </div>
+            <div id="wiz-import-status" style="font-size:12px;color:var(--text-muted);min-height:16px;margin-bottom:6px"></div>
+            <div id="wiz-import-results" style="display:none">
+              <select id="wiz-import-save" class="input" style="width:100%;margin-bottom:6px"></select>
+              <button class="btn btn-secondary" style="width:100%" onclick="wizImportSave()">Import Save →</button>
+            </div>
           </div>
         </div>
         <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:20px">
