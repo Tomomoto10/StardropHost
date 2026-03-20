@@ -331,16 +331,20 @@ echo -e "  Web panel:"
 echo ""
 echo -e "    ${CYAN}${BOLD}http://${SERVER_IP}:${PANEL_PORT}${NC}"
 echo ""
-echo -e "  Streaming live server logs below."
-echo -e "  ${YELLOW}Press Ctrl+C to stop watching — the server keeps running.${NC}"
+echo -e "  Showing startup logs for 15 seconds..."
 echo ""
 
 sleep 2
-docker logs -f "${CONTAINER_PREFIX}-server" 2>/dev/null \
-    || docker logs -f "${CONTAINER_PREFIX}" 2>/dev/null \
-    || $COMPOSE_CMD logs -f stardrop-server || true
+timeout 15 docker logs -f "${CONTAINER_PREFIX}-server" 2>/dev/null \
+    || timeout 15 docker logs -f "${CONTAINER_PREFIX}" 2>/dev/null \
+    || true
 
 echo ""
 echo -e "${CYAN}${BOLD}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
-echo -e "    ${CYAN}${BOLD}cd ./$(basename "$SCRIPT_DIR")${NC}"
+echo -e "${GREEN}${BOLD}  Server is running in the background.${NC}"
 echo -e "${CYAN}${BOLD}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+echo ""
+echo -e "  Web panel:  ${CYAN}${BOLD}http://${SERVER_IP}:${PANEL_PORT}${NC}"
+echo ""
+echo -e "  To watch logs:  ${CYAN}docker logs -f ${CONTAINER_PREFIX}-server${NC}"
+echo ""
