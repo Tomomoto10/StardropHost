@@ -142,11 +142,44 @@ if [ -f "$SCRIPT_DIR/data/game/StardewValley" ]; then
             | head -1 | grep -oE '[0-9]+\.[0-9]+\.[0-9]+')
     fi
     [ -n "$_CURRENT_SDV" ] && print_info "Installed: Stardew Valley v$_CURRENT_SDV"
-    echo ""
-    read -r -p "  Update Stardew Valley via Steam? (saves, mods, and config are preserved) [y/N] " _UPDATE_SDV
-    echo ""
 
-    if [[ "$_UPDATE_SDV" =~ ^[Yy]$ ]]; then
+    # Check Steam for the latest public build ID (anonymous, no credentials needed)
+    _SDV_BUILD_FILE="$SCRIPT_DIR/data/game/.steam_build_id"
+    _STORED_BUILD=$(cat "$_SDV_BUILD_FILE" 2>/dev/null || true)
+    _LATEST_BUILD=""
+
+    if docker image inspect stardrop-server:local >/dev/null 2>&1; then
+        print_info "Checking Steam for Stardew Valley updates..."
+        _LATEST_BUILD=$(timeout 30 docker run --rm stardrop-server:local \
+            bash -c "/home/steam/steamcmd/steamcmd.sh \
+                +login anonymous \
+                +app_info_update 1 \
+                +app_info_print 413150 \
+                +quit 2>/dev/null" 2>/dev/null \
+            | grep -A3 '"public"' | grep '"buildid"' | head -1 | grep -oE '[0-9]+' || true)
+    fi
+
+    _SDV_UPDATE_AVAILABLE=false
+    if [ -z "$_LATEST_BUILD" ]; then
+        print_warning "Could not reach Steam to check for SDV updates — skipping game update"
+    elif [ -z "$_STORED_BUILD" ] || [ "$_STORED_BUILD" != "$_LATEST_BUILD" ]; then
+        _SDV_UPDATE_AVAILABLE=true
+        if [ -n "$_STORED_BUILD" ]; then
+            print_info "Stardew Valley update available (build $_STORED_BUILD → $_LATEST_BUILD)"
+        else
+            print_info "No previous build ID on record — offering update check"
+        fi
+    else
+        print_success "Stardew Valley is up to date (build $_LATEST_BUILD)"
+    fi
+
+    echo ""
+    if [ "$_SDV_UPDATE_AVAILABLE" = "true" ]; then
+        read -r -p "  Update Stardew Valley via Steam? (saves, mods, and config are preserved) [y/N] " _UPDATE_SDV
+        echo ""
+    fi
+
+    if [ "$_SDV_UPDATE_AVAILABLE" = "true" ] && [[ "$_UPDATE_SDV" =~ ^[Yy]$ ]]; then
         if ! docker image inspect stardrop-server:local >/dev/null 2>&1; then
             print_warning "Docker image not yet built — game update skipped."
             print_info "Re-run update.sh after the first build to update the game."
@@ -196,12 +229,12 @@ if [ -f "$SCRIPT_DIR/data/game/StardewValley" ]; then
                 print_success "Stardew Valley updated"
                 _SMAPI_NEEDS_UPDATE=true
                 print_info "SMAPI will be reinstalled to match the updated game files"
+                # Store the new build ID so we don't prompt again until Steam pushes another update
+                [ -n "$_LATEST_BUILD" ] && echo "$_LATEST_BUILD" > "$_SDV_BUILD_FILE"
             else
                 print_warning "Game update may not have completed — check output above"
             fi
         fi
-    else
-        print_info "Skipping game update"
     fi
 else
     print_info "No game installed yet — skipping game update check"

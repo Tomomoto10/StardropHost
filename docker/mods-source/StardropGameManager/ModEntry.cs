@@ -111,7 +111,7 @@ namespace StardropGameManager
             if (Context.IsWorldReady)
             {
                 Game1.player.health  = Game1.player.maxHealth;
-                Game1.player.stamina = Game1.player.maxStamina;
+                Game1.player.stamina = (float)(int)Game1.player.maxStamina;
             }
 
             // Once world is ready, handle any blocking runtime dialogues
@@ -249,9 +249,9 @@ namespace StardropGameManager
             Game1.player.isCustomized.Value  = true;
 
             // ── Pet ───────────────────────────────────────────────────────────────
-            Game1.player.catPerson     = !string.Equals(cfg.PetSpecies, "dog",
-                                             StringComparison.OrdinalIgnoreCase);
-            Game1.player.whichPetBreed = Math.Clamp(cfg.PetBreed, 0, 4);
+            Game1.player.whichPetType  = string.Equals(cfg.PetSpecies, "dog",
+                                             StringComparison.OrdinalIgnoreCase) ? "dog" : "cat";
+            Game1.player.whichPetBreed = cfg.PetBreed.ToString();
 
             // ── Cabins ────────────────────────────────────────────────────────────
             int cabins = Math.Clamp(cfg.CabinCount, 1, 3);
@@ -308,7 +308,7 @@ namespace StardropGameManager
         private void OnSaveLoaded(object? sender, SaveLoadedEventArgs e)
         {
             // Remove built-in player cap so any number of farmhands can connect
-            try { Game1.netWorldState.Value.CurrentPlayerLimit.Value = int.MaxValue; }
+            try { Game1.netWorldState.Value.CurrentPlayerLimit = int.MaxValue; }
             catch (Exception ex) { Monitor.Log($"[StardropGameManager] Could not remove player limit: {ex.Message}", LogLevel.Warn); }
 
             // Apply move-build permission via chat command
@@ -343,7 +343,7 @@ namespace StardropGameManager
             if (Game1.activeClickableMenu is DialogueBox db && db.isQuestion && db.responses != null)
             {
                 int mushroomsIdx = -1, batsIdx = -1, yesIdx = -1, noIdx = -1;
-                for (int i = 0; i < db.responses.Count; i++)
+                for (int i = 0; i < db.responses.Count(); i++)
                 {
                     var text = db.responses[i].responseText?.ToLowerInvariant() ?? "";
                     if (text == "mushrooms") mushroomsIdx = i;
