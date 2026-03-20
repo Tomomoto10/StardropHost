@@ -1,12 +1,15 @@
 /**
  * StardropHost | web-panel/api/steam.js
- * Proxy to the steam-auth container.
- * The web panel never handles Steam credentials
- * directly — it passes them straight through to
- * the isolated steam-auth service.
+ * Proxy to the steam-auth container for wizard game download (login/guard/logout).
+ * The web panel never handles Steam credentials directly — it passes them
+ * straight through to the isolated steam-auth service.
+ *
+ * Invite code is read directly from the ServerDashboard SMAPI mod output —
+ * no Steam login is required for that.
  */
 
 const http   = require('http');
+const fs     = require('fs');
 const config = require('../server');
 
 const STEAM_AUTH_URL = process.env.STEAM_AUTH_URL || 'http://stardrop-steam-auth:18700';
@@ -60,7 +63,7 @@ async function getStatus(req, res) {
       loggedIn:  false,
       hasToken:  false,
       inviteCode: null,
-      message:   'Steam auth service is not running (optional for LAN play)',
+      message:   'Steam auth service is not running',
     });
   }
 }
@@ -106,18 +109,23 @@ async function logout(req, res) {
 }
 
 async function getInviteCode(req, res) {
-  // Invite code comes from the game via Game1.server.getInviteCode(),
-  // written to live-status.json by the ServerDashboard mod.
-  // No Steam auth required for this.
+  // Invite code is written by the ServerDashboard SMAPI mod via Game1.server.getInviteCode()
+
+  // 1. Try dedicated invite-code file (written immediately when code is generated)
   try {
-    const fs   = require('fs');
-    const path = require('path');
+    const code = fs.readFileSync('/tmp/invite-code.txt', 'utf-8').trim();
+    if (code) return res.json({ inviteCode: code });
+  } catch {}
+
+  // 2. Fall back to live-status.json
+  try {
     const liveFile = process.env.LIVE_FILE || '/home/steam/.local/share/stardrop/live-status.json';
     if (fs.existsSync(liveFile)) {
       const live = JSON.parse(fs.readFileSync(liveFile, 'utf-8'));
-      return res.json({ inviteCode: live.inviteCode || null });
+      if (live.inviteCode) return res.json({ inviteCode: live.inviteCode });
     }
   } catch {}
+
   res.json({ inviteCode: null });
 }
 

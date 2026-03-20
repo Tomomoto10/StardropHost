@@ -121,7 +121,7 @@ const farmAPI = require('./api/farm');
 app.get('/api/farm/overview',        auth.verifyMiddleware, farmAPI.getFarmOverview);
 app.get('/api/farm/live',            auth.verifyMiddleware, farmAPI.getLiveStatus);
 
-// -- Steam (steam-auth container) --
+// -- Steam (auth via steam-auth container + invite code from mod) --
 const steamAPI = require('./api/steam');
 app.get( '/api/steam/status',     auth.verifyMiddleware, steamAPI.getStatus);
 app.post('/api/steam/login',      auth.verifyMiddleware, steamAPI.login);

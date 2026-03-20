@@ -162,7 +162,15 @@ namespace ServerDashboard
 
         private string? TryGetInviteCode()
         {
-            try { return Game1.server?.getInviteCode(); }
+            try
+            {
+                var code = Game1.server?.getInviteCode();
+                if (!string.IsNullOrEmpty(code))
+                {
+                    try { System.IO.File.WriteAllText("/tmp/invite-code.txt", code); } catch {}
+                }
+                return code;
+            }
             catch { return null; }
         }
 

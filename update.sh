@@ -166,7 +166,7 @@ if [ -f "$SCRIPT_DIR/data/game/StardewValley" ]; then
         if [ -n "$_STORED_BUILD" ]; then
             print_info "Could not reach Steam — update check skipped (last known build: $_STORED_BUILD)"
         else
-            print_warning "Could not reach Steam to check for SDV updates — skipping game update"
+            print_info "Could not reach Steam — skipping game update check"
         fi
     elif [ "$_STORED_BUILD" != "$_LATEST_BUILD" ]; then
         _SDV_UPDATE_AVAILABLE=true

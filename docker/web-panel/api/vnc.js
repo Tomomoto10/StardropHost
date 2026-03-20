@@ -128,11 +128,21 @@ function startVnc(password) {
 
 function stopVnc() {
   try {
-    // Kill the monitor first so it can't restart x11vnc after we stop it
-    spawnSync('pkill', ['-f', 'vnc-monitor'], { encoding: 'utf-8' });
+    // Kill the monitor first so it can't restart x11vnc
+    spawnSync('pkill', ['-9', '-f', 'vnc-monitor'], { encoding: 'utf-8' });
     spawnSync('sleep', ['1']);
-    // Then kill x11vnc itself
-    spawnSync('pkill', ['-f', 'x11vnc'], { encoding: 'utf-8' });
+    // Force-kill x11vnc — use SIGKILL because -bg daemonizes it and it may ignore SIGTERM
+    spawnSync('pkill', ['-9', '-f', 'x11vnc'], { encoding: 'utf-8' });
+    spawnSync('sleep', ['1']);
+    // Verify it's dead
+    const still = spawnSync('pgrep', ['-f', 'x11vnc'], { encoding: 'utf-8' });
+    if (still.status === 0) {
+      // Last resort: kill by PID list
+      const pids = still.stdout.trim().split('\n').filter(Boolean);
+      for (const pid of pids) {
+        spawnSync('kill', ['-9', pid], { encoding: 'utf-8' });
+      }
+    }
     return true;
   } catch {
     return false;

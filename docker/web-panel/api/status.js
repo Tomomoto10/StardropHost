@@ -5,7 +5,6 @@
 
 const fs = require('fs');
 const { execSync, spawnSync } = require('child_process');
-const http = require('http');
 const https = require('https');
 const config = require('../server');
 
@@ -383,10 +382,6 @@ function restartServer(req, res) {
       timeout: 10000,
     });
     cachedStatus = null;
-
-    // Clear Steam session — each server start gets a new Steam lobby
-    const STEAM_AUTH_URL = process.env.STEAM_AUTH_URL || 'http://stardrop-steam-auth:18700';
-    http.request({ hostname: new URL(STEAM_AUTH_URL).hostname, port: new URL(STEAM_AUTH_URL).port || 80, path: '/logout', method: 'POST', headers: { 'Content-Length': 0 } }).end();
 
     res.json({ success: true, message: 'Game restart initiated' });
   } catch (e) {

@@ -205,6 +205,12 @@ namespace ServerDashboard
             string? inviteCode = null;
             try { inviteCode = Game1.server?.getInviteCode(); } catch {}
 
+            // Write to a dedicated file for fast access by the web panel (same container)
+            if (!string.IsNullOrEmpty(inviteCode))
+            {
+                try { File.WriteAllText("/tmp/invite-code.txt", inviteCode); } catch {}
+            }
+
             return new LiveStatus
             {
                 Timestamp        = DateTimeOffset.UtcNow.ToUnixTimeSeconds(),

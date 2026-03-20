@@ -81,8 +81,10 @@ services:
       - ./data/panel:/home/steam/web-panel/data:rw
       - ./data/custom-mods:/home/steam/custom-mods:ro
 
-  # --- Steam Auth - optional, for invite codes only---
-  # -- Credentials never touch the game container ---
+  # --- Steam Auth ---
+  # Handles Steam login + 2FA for game download via the wizard.
+  # Credentials are memory-only — never stored to disk.
+  # Port 18700 is intentionally NOT exposed to host.
   stardrop-steam-auth:
     build: ./docker/steam-auth
     image: stardrop-steam-auth:local
@@ -90,12 +92,4 @@ services:
     restart: unless-stopped
     environment:
       - STEAM_AUTH_PORT=18700
-      - SMAPI_LOG=/game-logs/SMAPI-latest.txt
-    volumes:
-      # Refresh token storage — never shared with game container
-      - ./data/steam-session:/data
-      # Read-only access to SMAPI log for invite code extraction
-      # SMAPI writes to StardewValley/ErrorLogs, not the stardrop logs dir
-      - ./data/saves/ErrorLogs:/game-logs:ro
-    # Port 18700 is intentionally NOT exposed to host.
-    # The web panel proxies to it via Docker's internal network.
+
