@@ -199,7 +199,10 @@ async function serverAuth(req, res) {
 
   let user, pass;
   if (guardCode && _pendingAuth) {
-    ({ username: user, password: pass } = _pendingAuth);
+    // If a guard code is present, we must have the username from the original
+    // request, which is stored in _pendingAuth. The user does not re-enter it.
+    ({ password: pass } = _pendingAuth);
+    user = _pendingAuth.username;
   } else {
     user = username;
     pass = password;
@@ -214,7 +217,7 @@ async function serverAuth(req, res) {
 
   const result = await _runSteamcmd(args);
 
-  if (result.guardRequired) {
+  if (result.guardRequired && !guardCode) {
     _pendingAuth = { username: user, password: pass };
     return res.json({ state: 'guard_required' });
   }
