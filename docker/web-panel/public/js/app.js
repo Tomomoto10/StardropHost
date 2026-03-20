@@ -1018,18 +1018,15 @@ async function wizComplete() {
   // Mark wizard complete in backend state regardless of step-check results
   try { await API.post('/api/wizard/force-complete'); } catch {}
 
-  // Poll for the new save and auto-select it (SMAPI may still be writing the save folder)
-  for (let attempt = 0; attempt < 6; attempt++) {
+  // For existing-save path: save is already on disk — auto-select if needed.
+  // For new-farm path: save won't exist until Day 1 ends; don't block here.
+  if (_wizState._farmMode === 'existing') {
     try {
       const savesData = await API.get('/api/saves');
-      if (savesData?.saves?.length) {
-        if (!savesData.selectedSave) {
-          await API.post('/api/saves/select', { saveName: savesData.saves[0].name });
-        }
-        break;
+      if (savesData?.saves?.length && !savesData.selectedSave) {
+        await API.post('/api/saves/select', { saveName: savesData.saves[0].name });
       }
     } catch {}
-    await new Promise(r => setTimeout(r, 3000));
   }
 
   document.getElementById('wizard-overlay').style.display = 'none';
@@ -2281,14 +2278,13 @@ function frCheckInput() {
 async function confirmFactoryReset() {
   const btn = document.getElementById('frConfirmBtn');
   btn.disabled = true;
-  btn.textContent = 'Deleting...';
+  btn.textContent = 'Resetting...';
 
   const data = await API.post('/api/wizard/factory-reset');
   if (data?.success) {
     closeFactoryResetModal();
-    sessionStorage.setItem('wizardHint', 'local');
-    showToast('Farm deleted. Reloading setup wizard…', 'success');
-    setTimeout(() => window.location.reload(), 1500);
+    showToast('Reset complete — restarting game and reloading wizard…', 'success');
+    setTimeout(() => window.location.reload(), 2500);
   } else {
     showToast(data?.error || 'Reset failed', 'error');
     btn.disabled = false;

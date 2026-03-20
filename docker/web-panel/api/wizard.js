@@ -12,6 +12,7 @@
 
 const fs   = require('fs');
 const path = require('path');
+const { spawnSync, spawn } = require('child_process');
 const config  = require('../server');
 const auth    = require('../auth');
 
@@ -516,27 +517,58 @@ function resetWizard(req, res) {
 
 function factoryReset(_req, res) {
   try {
-    const savesDir = config.SAVES_DIR;
+    // 1. Kill the running game so it restarts clean (no stale in-memory state)
+    spawnSync('pkill', ['-f', 'StardewModdingAPI'], { encoding: 'utf-8' });
 
-    // Delete all save folders
+    // 2. Delete all save folders
+    const savesDir = config.SAVES_DIR;
     if (fs.existsSync(savesDir)) {
       for (const entry of fs.readdirSync(savesDir, { withFileTypes: true })) {
-        if (!entry.isDirectory()) continue;
         fs.rmSync(path.join(savesDir, entry.name), { recursive: true, force: true });
       }
     }
 
-    // Clear active save selection marker
+    // 3. Delete stale runtime files
+    const filesToDelete = [
+      path.join(config.CONFIG_DIR || '/home/steam/.config/StardewValley', 'startup_preferences'),
+      config.LIVE_FILE,
+      path.join(config.DATA_DIR, 'new-farm.json'),
+    ];
+    for (const f of filesToDelete) {
+      try { if (f && fs.existsSync(f)) fs.unlinkSync(f); } catch {}
+    }
+
+    // 4. Clear SAVE_NAME from runtime.env so game doesn't look for a deleted save
     try {
-      const marker = path.join(savesDir, '.selected_save');
-      if (fs.existsSync(marker)) fs.unlinkSync(marker);
+      const envPath = findEnvFile();
+      if (fs.existsSync(envPath)) {
+        const updated = fs.readFileSync(envPath, 'utf-8')
+          .split('\n')
+          .filter(l => !l.startsWith('SAVE_NAME='))
+          .join('\n');
+        fs.writeFileSync(envPath, updated, 'utf-8');
+      }
     } catch {}
 
-    // Clear stale live-status so dashboard doesn't show old farm data
-    try { if (fs.existsSync(config.LIVE_FILE)) fs.unlinkSync(config.LIVE_FILE); } catch {}
-
-    // Reset wizard state so setup wizard shows on next load
+    // 5. Reset wizard state
     writeState(defaultState());
+
+    // 6. Restart the game process
+    //    If crash-monitor is running it restarts SMAPI automatically (~10s).
+    //    If not, start it directly after a short delay to let the kill settle.
+    const crashMonitorRunning =
+      spawnSync('pgrep', ['-f', 'crash-monitor'], { encoding: 'utf-8' }).status === 0;
+
+    if (!crashMonitorRunning) {
+      setTimeout(() => {
+        try {
+          spawn('bash', ['-c', 'cd /home/steam/stardewvalley && ./StardewModdingAPI --server &'], {
+            detached: true,
+            stdio: 'ignore',
+          }).unref();
+        } catch {}
+      }, 3000);
+    }
 
     res.json({ success: true });
   } catch (err) {
