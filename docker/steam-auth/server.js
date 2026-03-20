@@ -74,6 +74,7 @@ function createClient() {
     console.log('[steam-auth] Logged in to Steam');
     authState = 'online';
     lastError = '';
+    _inviteCodePollFast = true; // restart fast-poll on each login
 
     // Save refresh token for future logins
     if (client.steamID) {
@@ -148,9 +149,16 @@ function generateInviteCode() {
   writeStatus();
 }
 
-// Poll for invite code every 30s once logged in
+// Poll for invite code: every 5s until we find one, then every 30s
+let _inviteCodePollFast = true;
 setInterval(() => {
-  if (authState === 'online') generateInviteCode();
+  if (authState === 'online' && _inviteCodePollFast) {
+    generateInviteCode();
+    if (inviteCode) _inviteCodePollFast = false;
+  }
+}, 5000);
+setInterval(() => {
+  if (authState === 'online' && !_inviteCodePollFast) generateInviteCode();
 }, 30000);
 
 // -- Auto-login with refresh token on startup --

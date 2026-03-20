@@ -2013,10 +2013,17 @@ function renderSteamPanel(data) {
   }
 
   if (data.state === 'guard_required') {
+    // If input already exists, only update the error message — don't wipe what user typed
+    if (document.getElementById('steamGuardInput')) {
+      const errEl = panel.querySelector('.steam-guard-error');
+      if (errEl) errEl.textContent = data.lastError || '';
+      startSteamPolling();
+      return;
+    }
     panel.innerHTML = `
       <div style="margin-bottom:12px;font-size:13px;color:var(--text-secondary)">
         Steam Guard code required. Check your email or mobile authenticator app.
-        ${data.lastError ? `<div style="color:var(--accent-error);margin-top:4px">${escapeHtml(data.lastError)}</div>` : ''}
+        <div class="steam-guard-error" style="color:var(--accent-error);margin-top:4px">${escapeHtml(data.lastError || '')}</div>
       </div>
       <div class="form-row">
         <input type="text" id="steamGuardInput" class="input" placeholder="Enter Steam Guard code"
