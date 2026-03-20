@@ -121,13 +121,9 @@ function getWizardStatus(req, res) {
   const hasPassword = auth.isSetupComplete();
   const savesExist  = detectSaves();
 
-  // SMAPI being installed is proof the setup ran — even if state was reset or save is still being created.
-  const smapiInstalled = fs.existsSync('/home/steam/stardewvalley/StardewModdingAPI');
-
   // Wizard is needed if: never completed (and no saves to prove setup already ran), or game missing.
-  // Saves OR SMAPI installed are treated as proof the wizard ran, even if state file is missing/reset.
-  const setupRan    = state.completed || savesExist || smapiInstalled;
-  const needsWizard = !setupRan || !gamePresent;
+  // Saves existing is treated as proof the wizard ran, even if state file is missing/reset.
+  const needsWizard = (!state.completed && !savesExist) || !gamePresent;
 
   if (!needsWizard) {
     return res.json({ completed: true, needsWizard: false });
@@ -529,6 +525,21 @@ function factoryReset(_req, res) {
         fs.rmSync(path.join(savesDir, entry.name), { recursive: true, force: true });
       }
     }
+
+    // Clear active save selection
+    try {
+      const marker = path.join(savesDir, '.selected_save');
+      if (fs.existsSync(marker)) fs.unlinkSync(marker);
+      const prefs = path.join(config.CONFIG_DIR, 'startup_preferences');
+      if (fs.existsSync(prefs)) {
+        const content = fs.readFileSync(prefs, 'utf-8')
+          .replace(/^saveFolderName\s*=.*$/m, 'saveFolderName=');
+        fs.writeFileSync(prefs, content, 'utf-8');
+      }
+    } catch {}
+
+    // Clear stale live-status so dashboard doesn't show old farm data
+    try { if (fs.existsSync(config.LIVE_FILE)) fs.unlinkSync(config.LIVE_FILE); } catch {}
 
     // Reset wizard state so setup wizard shows on next load
     writeState(defaultState());

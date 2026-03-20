@@ -1725,7 +1725,6 @@ async function loadConfig() {
       row.innerHTML =
         `<div>
           <div class="config-label">${escapeHtml(item.label)}</div>
-          <div class="config-key">${item.key}</div>
           ${item.description ? `<div class="config-help">${escapeHtml(item.description)}</div>` : ''}
         </div>
         <div class="config-value">${valueHtml}</div>`;

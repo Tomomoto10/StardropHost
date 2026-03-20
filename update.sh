@@ -149,10 +149,11 @@ if [ -f "$SCRIPT_DIR/data/game/StardewValley" ]; then
     _LATEST_BUILD=""
 
     print_info "Checking Steam for Stardew Valley updates..."
-    _LATEST_BUILD=$(curl -s --max-time 10 \
+    _LATEST_BUILD=$(curl -fsSL --max-time 15 --retry 2 --retry-delay 3 \
         "https://api.steampowered.com/ISteamApps/UpToDateCheck/v0001/?appid=413150&version=0" \
         2>/dev/null \
-        | grep -o '"required_version":[0-9]*' | grep -o '[0-9]*$' || true)
+        | grep -oE '"required_version"[[:space:]]*:[[:space:]]*[0-9]+' \
+        | grep -oE '[0-9]+' || true)
 
     # Seed stored build ID on first run
     if [ -n "$_LATEST_BUILD" ] && [ -z "$_STORED_BUILD" ]; then
@@ -162,7 +163,11 @@ if [ -f "$SCRIPT_DIR/data/game/StardewValley" ]; then
 
     _SDV_UPDATE_AVAILABLE=false
     if [ -z "$_LATEST_BUILD" ]; then
-        print_warning "Could not reach Steam to check for SDV updates — skipping game update"
+        if [ -n "$_STORED_BUILD" ]; then
+            print_info "Could not reach Steam — update check skipped (last known build: $_STORED_BUILD)"
+        else
+            print_warning "Could not reach Steam to check for SDV updates — skipping game update"
+        fi
     elif [ "$_STORED_BUILD" != "$_LATEST_BUILD" ]; then
         _SDV_UPDATE_AVAILABLE=true
         print_info "Stardew Valley update available (build $_STORED_BUILD → $_LATEST_BUILD)"
