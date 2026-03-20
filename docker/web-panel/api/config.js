@@ -13,12 +13,6 @@ const config = require('../server');
 
 const CONFIG_SCHEMA = {
   'Server': [
-    { key: 'SERVER_MODE', label: 'Connection Mode', type: 'select', default: 'lan',
-      description: 'LAN: server starts immediately, no Steam required. Steam: authenticate via the web panel to get a Steam invite code. Takes effect on next restart.',
-      options: [
-        { value: 'lan',   label: 'LAN — no Steam required (default)' },
-        { value: 'steam', label: 'Steam — authenticate for invite codes' },
-      ] },
     { key: 'SERVER_PASSWORD',  label: 'Server Password',  type: 'password', viewable: true, default: '' },
     { key: 'PUBLIC_IP',        label: 'Public Join IP',    type: 'text',     default: '',
       description: 'Shown to players on the join screen. Leave blank to auto-detect.' },

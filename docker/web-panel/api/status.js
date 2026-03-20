@@ -5,6 +5,7 @@
 
 const fs = require('fs');
 const { execSync, spawnSync } = require('child_process');
+const http  = require('http');
 const https = require('https');
 const config = require('../server');
 

@@ -219,24 +219,26 @@ namespace ServerDashboard
             int   hours12  = hours > 12 ? hours - 12 : hours == 0 ? 12 : hours;
             string timeStr = $"{hours12}:{minutes:D2} {(isPm ? "PM" : "AM")}";
 
+            // Only attempt invite code retrieval when Steam auth is confirmed (/tmp/steam-ready).
+            // In LAN mode this file is never created, so we skip entirely to avoid log spam.
             string? inviteCode = null;
-            try { inviteCode = Game1.server?.getInviteCode(); } catch (Exception ex)
+            bool steamReady = File.Exists("/tmp/steam-ready");
+            if (steamReady)
             {
-                Monitor.Log($"[InviteCode] getInviteCode() threw: {ex.Message}", LogLevel.Warn);
-            }
+                try { inviteCode = Game1.server?.getInviteCode(); } catch (Exception ex)
+                {
+                    Monitor.Log($"[InviteCode] getInviteCode() threw: {ex.Message}", LogLevel.Warn);
+                }
 
-            // Diagnostic logging every write cycle
-            if (Game1.server == null)
-                Monitor.Log("[InviteCode] Game1.server is NULL — not hosting a multiplayer session", LogLevel.Warn);
-            else if (string.IsNullOrEmpty(inviteCode))
-                Monitor.Log($"[InviteCode] Game1.server is {Game1.server.GetType().Name} but getInviteCode() returned null/empty — Steam SDK may not be connected", LogLevel.Warn);
-            else
-                Monitor.Log($"[InviteCode] Code: {inviteCode}", LogLevel.Info);
+                if (string.IsNullOrEmpty(inviteCode))
+                    Monitor.Log("[InviteCode] Steam authenticated but invite code is still null — Steam lobby may not be ready yet", LogLevel.Debug);
+                else
+                    Monitor.Log($"[InviteCode] Code: {inviteCode}", LogLevel.Debug);
 
-            // Write to a dedicated file for fast access by the web panel (same container)
-            if (!string.IsNullOrEmpty(inviteCode))
-            {
-                try { File.WriteAllText("/tmp/invite-code.txt", inviteCode); } catch {}
+                if (!string.IsNullOrEmpty(inviteCode))
+                {
+                    try { File.WriteAllText("/tmp/invite-code.txt", inviteCode); } catch {}
+                }
             }
 
             return new LiveStatus
