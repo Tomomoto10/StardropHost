@@ -69,6 +69,23 @@ namespace ServerDashboard
         {
             // Write an initial offline status immediately on launch
             WriteOffline();
+
+            // Diagnostic: confirm Steam SDK is in place
+            string sdkPath = Path.Combine(
+                Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),
+                ".steam", "sdk64", "steamclient.so");
+            Monitor.Log(File.Exists(sdkPath)
+                ? $"[InviteCode] Steam SDK found at {sdkPath}"
+                : $"[InviteCode] Steam SDK NOT found at {sdkPath} — invite codes will not work",
+                File.Exists(sdkPath) ? LogLevel.Info : LogLevel.Warn);
+
+            string appIdPath = Path.Combine(
+                Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),
+                "stardewvalley", "steam_appid.txt");
+            Monitor.Log(File.Exists(appIdPath)
+                ? $"[InviteCode] steam_appid.txt found: {File.ReadAllText(appIdPath).Trim()}"
+                : $"[InviteCode] steam_appid.txt NOT found at {appIdPath}",
+                File.Exists(appIdPath) ? LogLevel.Info : LogLevel.Warn);
         }
 
         private void OnUpdateTicked(object? sender, UpdateTickedEventArgs e)
@@ -203,7 +220,18 @@ namespace ServerDashboard
             string timeStr = $"{hours12}:{minutes:D2} {(isPm ? "PM" : "AM")}";
 
             string? inviteCode = null;
-            try { inviteCode = Game1.server?.getInviteCode(); } catch {}
+            try { inviteCode = Game1.server?.getInviteCode(); } catch (Exception ex)
+            {
+                Monitor.Log($"[InviteCode] getInviteCode() threw: {ex.Message}", LogLevel.Warn);
+            }
+
+            // Diagnostic logging every write cycle
+            if (Game1.server == null)
+                Monitor.Log("[InviteCode] Game1.server is NULL — not hosting a multiplayer session", LogLevel.Warn);
+            else if (string.IsNullOrEmpty(inviteCode))
+                Monitor.Log($"[InviteCode] Game1.server is {Game1.server.GetType().Name} but getInviteCode() returned null/empty — Steam SDK may not be connected", LogLevel.Warn);
+            else
+                Monitor.Log($"[InviteCode] Code: {inviteCode}", LogLevel.Info);
 
             // Write to a dedicated file for fast access by the web panel (same container)
             if (!string.IsNullOrEmpty(inviteCode))
