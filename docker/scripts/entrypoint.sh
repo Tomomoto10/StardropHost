@@ -531,21 +531,33 @@ if [ -d "$CUSTOM_MODS_DIR" ] && [ "$(ls -A "$CUSTOM_MODS_DIR" 2>/dev/null)" ]; t
 fi
 
 # -- Step 4.7: Steam SDK setup --
-# Links steamcmd's steamclient.so to the location the game's Steam runtime
-# expects, and writes steam_appid.txt so the SDK targets Stardew Valley.
-# Without this the game cannot connect to Steam and getInviteCode() returns null.
+# Downloads Steamworks SDK Redist (App 1007, anonymous) to obtain steamclient.so,
+# links it to ~/.steam/sdk64/ so the game's libsteam_api.so can connect to Steam,
+# and writes steam_appid.txt so the SDK targets Stardew Valley (413150).
+# Without this, Game1.server.getInviteCode() always returns null.
 log_step "Step 4.7: Setting up Steam SDK for multiplayer..."
 
-STEAM_SDK_SRC="/home/steam/steamcmd/linux64/steamclient.so"
+STEAM_SDK_CACHE="/home/steam/steam-sdk"
+STEAM_SDK_SO="$STEAM_SDK_CACHE/linux64/steamclient.so"
 STEAM_SDK_DEST_DIR="/home/steam/.steam/sdk64"
 STEAM_APPID_FILE="/home/steam/stardewvalley/steam_appid.txt"
 
-if [ -f "$STEAM_SDK_SRC" ]; then
+if [ ! -f "$STEAM_SDK_SO" ]; then
+    log_info "Downloading Steamworks SDK Redist (App 1007, anonymous)..."
+    mkdir -p "$STEAM_SDK_CACHE"
+    /home/steam/steamcmd/steamcmd.sh \
+        +force_install_dir "$STEAM_SDK_CACHE" \
+        +login anonymous \
+        +app_update 1007 \
+        +quit 2>&1 | tail -5
+fi
+
+if [ -f "$STEAM_SDK_SO" ]; then
     mkdir -p "$STEAM_SDK_DEST_DIR"
-    ln -sf "$STEAM_SDK_SRC" "$STEAM_SDK_DEST_DIR/steamclient.so"
+    ln -sf "$STEAM_SDK_SO" "$STEAM_SDK_DEST_DIR/steamclient.so"
     log_info "✅ Steam SDK linked ($STEAM_SDK_DEST_DIR/steamclient.so)"
 else
-    log_warn "⚠️  steamclient.so not found at $STEAM_SDK_SRC — Steam invite codes may not work"
+    log_warn "⚠️  Could not obtain steamclient.so — Steam invite codes will not work"
 fi
 
 echo "413150" > "$STEAM_APPID_FILE"

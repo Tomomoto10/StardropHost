@@ -149,11 +149,27 @@ if [ -f "$SCRIPT_DIR/data/game/StardewValley" ]; then
     _LATEST_BUILD=""
 
     print_info "Checking Steam for Stardew Valley updates..."
-    _LATEST_BUILD=$(curl -fsSL --max-time 15 --retry 2 --retry-delay 3 \
-        "https://api.steampowered.com/ISteamApps/UpToDateCheck/v0001/?appid=413150&version=0" \
+
+    # Method 1: Steam Web API (fast, no Docker needed)
+    _LATEST_BUILD=$(curl -sSL --max-time 10 \
+        "https://api.steampowered.com/ISteamApps/UpToDateCheck/v1/?appid=413150&version=0" \
         2>/dev/null \
         | grep -oE '"required_version"[[:space:]]*:[[:space:]]*[0-9]+' \
         | grep -oE '[0-9]+' || true)
+
+    # Method 2: steamcmd in Docker (reliable fallback — reads public depot build ID anonymously)
+    if [ -z "$_LATEST_BUILD" ] && docker image inspect stardrop-server:local >/dev/null 2>&1; then
+        print_info "(Steam API unavailable — checking via steamcmd, this may take ~20s...)"
+        _sdv_info=$(timeout 60 docker run --rm stardrop-server:local \
+            /home/steam/steamcmd/steamcmd.sh \
+            +login anonymous +app_info_update 1 +app_info_print 413150 +quit \
+            2>/dev/null | tr -d '\r')
+        _LATEST_BUILD=$(echo "$_sdv_info" \
+            | grep -A10 '"branches"' \
+            | grep -A5  '"public"' \
+            | grep '"buildid"' \
+            | grep -oE '"[0-9]{6,}"' | tr -d '"' | head -1)
+    fi
 
     # Seed stored build ID on first run
     if [ -n "$_LATEST_BUILD" ] && [ -z "$_STORED_BUILD" ]; then
