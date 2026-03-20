@@ -1153,10 +1153,18 @@ async function startupSteamGuard() {
     status.style.color = 'var(--accent)';
     status.textContent = '✅ Authenticated — loading dashboard…';
     setTimeout(hideSteamAuthOverlay, 800);
-  } else {
+  } else if (data?.state === 'guard_required') {
     status.style.color = 'var(--accent-error,#ef4444)';
     status.textContent = data?.error || 'Invalid code — try again.';
     btn.disabled = false;
+  } else {
+    status.style.color = 'var(--accent-error,#ef4444)';
+    status.textContent = data?.error || 'Login failed. Please try signing in again.';
+    btn.textContent  = 'Sign In to Steam';
+    btn.onclick      = startupSteamLogin;
+    btn.disabled     = false;
+    document.getElementById('sa-guard-row').style.display = 'none';
+    document.getElementById('sa-guard').value = '';
   }
 }
 
