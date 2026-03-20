@@ -429,6 +429,33 @@ else
     log_warn "⚠️  ServerDashboard source not found at $SD_SRC — skipping"
 fi
 
+# -- Step 3.55: Build AutoHideHost mod (translated source replaces pre-built DLL) --
+log_step "Step 3.55: Building AutoHideHost mod..."
+
+AHH_SRC="/home/steam/mod-source/AutoHideHost"
+AHH_DEST="/home/steam/preinstalled-mods/AutoHideHost"
+
+if [ -d "$AHH_SRC" ]; then
+    log_info "Building AutoHideHost against game files..."
+    dotnet build "$AHH_SRC" -c Release \
+        /p:GamePath=/home/steam/stardewvalley \
+        /p:EnableModDeploy=false \
+        /p:EnableModZip=false \
+        2>&1
+
+    AHH_OUT="$AHH_SRC/bin/Release/net6.0"
+    if [ -f "$AHH_OUT/AutoHideHost.dll" ]; then
+        mkdir -p "$AHH_DEST"
+        cp "$AHH_OUT/AutoHideHost.dll" "$AHH_DEST/"
+        chown -R steam:steam "$AHH_DEST" 2>/dev/null || true
+        log_info "✅ AutoHideHost built and staged"
+    else
+        log_warn "⚠️  AutoHideHost build failed — using pre-built version"
+    fi
+else
+    log_warn "⚠️  AutoHideHost source not found at $AHH_SRC — using pre-built version"
+fi
+
 # -- Step 3.6: Build StardropGameManager mod --
 # Headless co-op startup orchestrator — replaces both FarmAutoCreate and ServerAutoLoad.
 # Loads the most recent save as co-op host, or creates a new native co-op farm from

@@ -254,9 +254,9 @@ namespace StardropGameManager
             Game1.player.whichPetBreed = cfg.PetBreed.ToString();
 
             // ── Cabins ────────────────────────────────────────────────────────────
-            int cabins = Math.Clamp(cfg.CabinCount, 1, 3);
-            if (cfg.CabinCount > 3)
-                Monitor.Log("[StardropGameManager] CabinCount >3 capped at 3.", LogLevel.Warn);
+            int cabins = Math.Clamp(cfg.CabinCount, 1, 4);
+            if (cfg.CabinCount > 4)
+                Monitor.Log("[StardropGameManager] CabinCount >4 capped at 4.", LogLevel.Warn);
             Game1.startingCabins = cabins;
             Game1.cabinsSeparate = string.Equals(cfg.CabinLayout, "separate",
                                         StringComparison.OrdinalIgnoreCase);

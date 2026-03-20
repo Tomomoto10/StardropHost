@@ -201,7 +201,7 @@ function collectStatus(req = null) {
 
       // Use live data to fill gaps or override stale status.json data
       if (live.players?.length > 0) {
-        status.players.online = live.players.filter(p => p.isOnline).length;
+        status.players.online = live.players.filter(p => p.isOnline && !p.isHost).length;
       }
       if (live.season) status.season = live.season;
       if (live.day) status.day = `${live.season} ${live.day}, Year ${live.year}`;

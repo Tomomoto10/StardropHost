@@ -91,11 +91,13 @@ RUN rm -rf /home/steam/preinstalled-mods/ServerAutoLoad && \
 # which is only available at runtime, not at image build time.
 # Pre-restoring HERE (as steam) caches NuGet packages into /home/steam/.nuget
 # so the runtime dotnet build (also run as steam) can find them offline.
-COPY --chown=steam:steam mods-source/ServerDashboard/       /home/steam/mod-source/ServerDashboard/
-COPY --chown=steam:steam mods-source/StardropGameManager/   /home/steam/mod-source/StardropGameManager/
+COPY --chown=steam:steam mods-source/ServerDashboard/           /home/steam/mod-source/ServerDashboard/
+COPY --chown=steam:steam mods-source/StardropGameManager/       /home/steam/mod-source/StardropGameManager/
+COPY --chown=steam:steam mods-source/AutoHideHost_v1.0.1/       /home/steam/mod-source/AutoHideHost/
 USER steam
 RUN cd /home/steam/mod-source/ServerDashboard     && dotnet restore 2>&1 || true && \
-    cd /home/steam/mod-source/StardropGameManager && dotnet restore 2>&1 || true
+    cd /home/steam/mod-source/StardropGameManager && dotnet restore 2>&1 || true && \
+    cd /home/steam/mod-source/AutoHideHost        && dotnet restore 2>&1 || true
 
 # -- Copy scripts --
 COPY --chown=steam:steam scripts/entrypoint.sh /home/steam/entrypoint.sh

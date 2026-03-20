@@ -159,16 +159,18 @@ if [ -f "$SCRIPT_DIR/data/game/StardewValley" ]; then
             | grep -A3 '"public"' | grep '"buildid"' | head -1 | grep -oE '[0-9]+' || true)
     fi
 
+    # Seed the stored build ID on first run so future runs skip automatically
+    if [ -n "$_LATEST_BUILD" ] && [ -z "$_STORED_BUILD" ]; then
+        echo "$_LATEST_BUILD" > "$_SDV_BUILD_FILE"
+        _STORED_BUILD="$_LATEST_BUILD"
+    fi
+
     _SDV_UPDATE_AVAILABLE=false
     if [ -z "$_LATEST_BUILD" ]; then
         print_warning "Could not reach Steam to check for SDV updates — skipping game update"
-    elif [ -z "$_STORED_BUILD" ] || [ "$_STORED_BUILD" != "$_LATEST_BUILD" ]; then
+    elif [ "$_STORED_BUILD" != "$_LATEST_BUILD" ]; then
         _SDV_UPDATE_AVAILABLE=true
-        if [ -n "$_STORED_BUILD" ]; then
-            print_info "Stardew Valley update available (build $_STORED_BUILD → $_LATEST_BUILD)"
-        else
-            print_info "No previous build ID on record — offering update check"
-        fi
+        print_info "Stardew Valley update available (build $_STORED_BUILD → $_LATEST_BUILD)"
     else
         print_success "Stardew Valley is up to date (build $_LATEST_BUILD)"
     fi
