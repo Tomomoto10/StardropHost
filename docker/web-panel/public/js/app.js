@@ -173,6 +173,20 @@ function wizGoToStep(n) {
     dot.classList.toggle('active', dotStep === n);
   });
   _wizState.currentStep = n;
+
+  // After factory reset: auto-select "Copy Manually" since game files already exist
+  if (n === 2) {
+    const hint = sessionStorage.getItem('wizardHint');
+    if (hint === 'local') {
+      sessionStorage.removeItem('wizardHint');
+      wizSetMethod('local');
+    }
+  }
+
+  // Ensure timezone picker is built when step 5 is shown (handles refresh mid-wizard)
+  if (n === 5 && !document.getElementById('wiz-tz-picker-search')) {
+    buildTzPicker('wiz-tz-picker', Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC');
+  }
 }
 
 function wizSetMethod(method) {
@@ -950,6 +964,15 @@ function wizPollGameReady(prevPct) {
 
 async function wizComplete() {
   if (_gameReadyTimer) { clearTimeout(_gameReadyTimer); _gameReadyTimer = null; }
+
+  // Auto-select the new save if none is currently active
+  try {
+    const savesData = await API.get('/api/saves');
+    if (savesData?.saves?.length && !savesData.selectedSave) {
+      await API.post('/api/saves/select', { saveName: savesData.saves[0].name });
+    }
+  } catch {}
+
   document.getElementById('wizard-overlay').style.display = 'none';
   document.getElementById('app').style.display = 'flex';
   init();
@@ -1077,7 +1100,7 @@ function init() {
 // ─── Navigation ──────────────────────────────────────────────────
 const PAGE_TITLES = {
   dashboard: 'Dashboard', farm: 'Farm', players: 'Players',
-  saves: 'Saves', mods: 'Mods', terminal: 'Console', logs: 'Logs', config: 'Config',
+  saves: 'Saves', mods: 'Mods', terminal: 'Console', logs: 'Logs', invite: 'Steam Invite Codes', config: 'Config',
 };
 
 function setupNavigation() {
@@ -1099,8 +1122,8 @@ function navigateTo(page) {
   setText('pageTitle', PAGE_TITLES[page] || page);
   document.getElementById('sidebar').classList.remove('open');
 
-  // Stop Steam polling when leaving config
-  if (page !== 'config') stopSteamPolling();
+  // Stop Steam polling when leaving invite/config
+  if (page !== 'config' && page !== 'invite') stopSteamPolling();
 
   switch (page) {
     case 'dashboard': loadDashboard();                         break;
@@ -1109,7 +1132,8 @@ function navigateTo(page) {
     case 'saves':     loadSaves();                             break;
     case 'mods':      loadMods();                              break;
     case 'logs':      loadLogs('all'); subscribeToLogs('all'); break;
-    case 'config':    loadConfig(); loadVnc(); loadSteam();    break;
+    case 'invite':    loadSteam();                             break;
+    case 'config':    loadConfig(); loadVnc();                 break;
   }
 }
 
@@ -1461,9 +1485,9 @@ async function loadSaves() {
           </div>
           <div class="save-actions">
             ${!s.isSelected ? `<button class="btn btn-sm" data-save-name="${escapeHtml(s.name)}">Select</button>` : ''}
-            <button class="btn btn-sm save-delete-btn" style="color:#ef4444;border-color:#ef4444"
+            ${!s.isSelected ? `<button class="btn btn-sm save-delete-btn" style="color:#ef4444;border-color:#ef4444"
               data-save-name="${escapeHtml(s.name)}" data-farm="${escapeHtml(s.farmName || s.name)}">
-              ${icon('trash', 'icon')}</button>
+              ${icon('trash', 'icon')}</button>` : ''}
           </div>
         </div>
       `).join('');
@@ -1644,6 +1668,8 @@ async function loadConfig() {
   const container = document.getElementById('configContainer');
   container.innerHTML = '';
 
+  const deferredTzPickers = [];
+
   for (const group of data.groups) {
     // VNC & Display settings are rendered inside the VNC panel card below
     if (group.name === 'VNC & Display') continue;
@@ -1678,8 +1704,7 @@ async function loadConfig() {
           <button type="button" class="password-toggle" onclick="togglePasswordVisibility(this)" title="Show password">
             ${icon('eye', 'icon')}</button></div>`;
       } else if (item.type === 'timezone') {
-        const pickerId = `cfg-tz-${item.key}`;
-        valueHtml = `<div class="tz-picker" id="${pickerId}" style="width:260px"></div>`;
+        valueHtml = `<div class="tz-picker" id="cfg-tz-${item.key}" style="width:260px"></div>`;
       } else if (item.sensitive) {
         valueHtml = `<input type="password" class="input" data-key="${item.key}" placeholder="••••••••" style="width:150px" onchange="configChanged()">`;
       } else {
@@ -1697,23 +1722,23 @@ async function loadConfig() {
         <div class="config-value">${valueHtml}</div>`;
 
       if (item.type === 'timezone') {
-        // Build picker after the row is in the DOM; hidden input gets data-key for saveConfig
-        const pickerId = `cfg-tz-${item.key}`;
-        card.appendChild(row);
-        buildTzPicker(pickerId, item.value || item.default || 'UTC');
-        // Patch the hidden input to carry data-key so saveConfig collects it
-        const hidden = document.getElementById(`${pickerId}-val`);
-        if (hidden) { hidden.dataset.key = item.key; hidden.addEventListener('change', configChanged); }
-        // Fire configChanged when a tz is picked
-        const searchInput = document.getElementById(`${pickerId}-search`);
-        if (searchInput) searchInput.addEventListener('input', configChanged);
-        continue;
+        // Defer buildTzPicker until after card is appended to container (getElementById needs DOM)
+        deferredTzPickers.push({ id: `cfg-tz-${item.key}`, value: item.value || item.default || 'UTC', key: item.key });
       }
 
       card.appendChild(row);
     }
 
     container.appendChild(card);
+
+    // Now card is in the DOM — build any deferred timezone pickers for this card
+    for (const p of deferredTzPickers.splice(0)) {
+      buildTzPicker(p.id, p.value);
+      const hidden = document.getElementById(`${p.id}-val`);
+      if (hidden) { hidden.dataset.key = p.key; hidden.addEventListener('change', configChanged); }
+      const searchEl = document.getElementById(`${p.id}-search`);
+      if (searchEl) searchEl.addEventListener('input', configChanged);
+    }
   }
 
   const saveRow = document.createElement('div');
@@ -2203,6 +2228,7 @@ async function confirmFactoryReset() {
   const data = await API.post('/api/wizard/factory-reset');
   if (data?.success) {
     closeFactoryResetModal();
+    sessionStorage.setItem('wizardHint', 'local');
     showToast('Farm deleted. Reloading setup wizard…', 'success');
     setTimeout(() => window.location.reload(), 1500);
   } else {

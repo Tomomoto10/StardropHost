@@ -256,6 +256,10 @@
           <span class="nav-icon"><svg class="icon"><use href="#icon-logs"></use></svg></span>
           <span class="nav-label">Logs</span>
         </li>
+        <li class="nav-item" data-page="invite">
+          <span class="nav-icon"><svg class="icon"><use href="#icon-players"></use></svg></span>
+          <span class="nav-label">Invite</span>
+        </li>
         <li class="nav-item" data-page="config">
           <span class="nav-icon"><svg class="icon"><use href="#icon-config"></use></svg></span>
           <span class="nav-label">Config</span>
@@ -283,6 +287,7 @@
       <button class="mob-nav-item" type="button" data-page="mods"><svg class="icon"><use href="#icon-mods"></use></svg></button>
       <button class="mob-nav-item" type="button" data-page="terminal"><svg class="icon"><use href="#icon-terminal"></use></svg></button>
       <button class="mob-nav-item" type="button" data-page="logs"><svg class="icon"><use href="#icon-logs"></use></svg></button>
+      <button class="mob-nav-item" type="button" data-page="invite"><svg class="icon"><use href="#icon-players"></use></svg></button>
       <button class="mob-nav-item" type="button" data-page="config"><svg class="icon"><use href="#icon-config"></use></svg></button>
     </nav>
 
@@ -585,12 +590,16 @@
             </div>
           </div>
 
-          <div class="card" style="margin-top:16px">
-            <h3>Steam Invite Codes
-              <span style="font-size:12px;color:var(--text-muted);font-weight:400">
-                (optional — LAN play works without this)
-              </span>
-            </h3>
+        </section>
+
+        <!-- ── Invite ─────────────────────────────────────────── -->
+        <section id="page-invite" class="page">
+          <div class="card">
+            <h3>Steam Invite Codes</h3>
+            <p style="font-size:13px;color:var(--text-secondary);margin-bottom:16px">
+              Generate a Steam invite code so players can join without port forwarding.
+              LAN play works without this — Steam is only needed for invite codes.
+            </p>
             <div id="steamPanel">
               <div class="empty-state">Loading Steam status...</div>
             </div>

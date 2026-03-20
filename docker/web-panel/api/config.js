@@ -18,7 +18,6 @@ const CONFIG_SCHEMA = {
       description: 'Shown to players on the join screen. Leave blank to auto-detect.' },
   ],
   'VNC & Display': [
-    { key: 'ENABLE_VNC',        label: 'Enable VNC Remote Access', type: 'boolean', default: 'false' },
     { key: 'VNC_PASSWORD',      label: 'VNC Password',             type: 'password', viewable: true, default: 'stardew1', maxLength: 8 },
     { key: 'DISABLE_RENDERING', label: 'Disable Rendering when VNC is off', type: 'boolean', default: 'true',
       description: 'Turns off the display server when VNC is not active. Saves CPU.' },
