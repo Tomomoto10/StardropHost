@@ -1,8 +1,0 @@
-{
-  "permissions": {
-    "allow": [
-      "Bash(grep -rn \"invite\\\\|InviteCode\\\\|getInviteCode\\\\|live-status\\\\|inviteCode\" '/home/user/Documents/StardropHost/Reference projects/puppy-stardew-server-main/docker/web-panel/' --include=*.js)",
-      "Bash(xargs ls:*)"
-    ]
-  }
-}
