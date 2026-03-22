@@ -1,1 +1,1 @@
-Under heavy developmeny, this repository should not be used.
+Under heavy development, this repository should not be used.
