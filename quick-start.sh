@@ -730,7 +730,7 @@ trap _copy_log_on_exit EXIT
 confirm() {
     local answer
     echo -ne "${YELLOW}${BOLD}$1 [y/N]: ${NC}"
-    read -r answer
+    read -r answer </dev/tty
     case "$answer" in
         y|Y|yes|YES) return 0 ;;
         *) return 1 ;;
