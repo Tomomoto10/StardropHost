@@ -320,16 +320,12 @@ fi
 
 print_success "Containers started"
 
-# -- Resolve panel URL for the done message --
-# With macvlan each instance has its own CONTAINER_IP — use that if set
-SERVER_IP="${CONTAINER_IP:-}"
-if [ -z "$SERVER_IP" ]; then
-    SERVER_IP=$(hostname -I 2>/dev/null | awk '{print $1}')
+# -- Resolve IP and panel port for the done message --
+LOCAL_IP=$(hostname -I 2>/dev/null | awk '{print $1}')
+if [ -z "$LOCAL_IP" ] && command -v ip &>/dev/null; then
+    LOCAL_IP=$(ip route get 1.1.1.1 2>/dev/null | awk '/src/{for(i=1;i<=NF;i++) if($i=="src"){print $(i+1);exit}}')
 fi
-if [ -z "$SERVER_IP" ] && command -v ip &>/dev/null; then
-    SERVER_IP=$(ip route get 1.1.1.1 2>/dev/null | awk '/src/{for(i=1;i<=NF;i++) if($i=="src"){print $(i+1);exit}}')
-fi
-SERVER_IP="${SERVER_IP:-your-server-ip}"
+SERVER_IP="${LOCAL_IP:-your-server-ip}"
 PANEL_PORT="${PANEL_PORT:-18642}"
 
 # -- Done --

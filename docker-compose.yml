@@ -21,8 +21,6 @@ services:
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
       - ${PWD}:${PWD}:ro
-    networks:
-      - internal
 
   # --- Init ---
   # Runs once on startup as root to create
@@ -43,15 +41,10 @@ services:
       - ./data/logs:/home/steam/.local/share/stardrop/logs:rw
       - ./data/backups:/home/steam/.local/share/stardrop/backups:rw
       - ./data/panel:/home/steam/web-panel/data:rw
-    networks:
-      - internal
 
   # --- Server ---
   # Main container, runs Stardew Valley + SMAPI
-  # + web panel + all background services.
-  # Connected to both networks:
-  #   macvlan  — own LAN IP, game port directly accessible (no NAT)
-  #   internal — reaches manager + steam-auth by service name
+  # + web panel + all background services
   stardrop-server:
     build: ./docker
     image: stardrop-server:local
@@ -76,6 +69,11 @@ services:
       - SAVE_NAME=${SAVE_NAME:-}
       - PANEL_PORT=${PANEL_PORT:-18642}
       - SERVER_MODE=${SERVER_MODE:-lan}
+    ports:
+      - "${GAME_PORT:-24642}:24642/udp"
+      - "${VNC_PORT:-5900}:5900"
+      - "${METRICS_PORT:-9090}:9090"
+      - "${PANEL_PORT:-18642}:${PANEL_PORT:-18642}"
     volumes:
       - ./data/saves:/home/steam/.config/StardewValley:rw
       - ./data/game:/home/steam/stardewvalley:rw
@@ -84,15 +82,11 @@ services:
       - ./data/panel:/home/steam/web-panel/data:rw
       - ./data/custom-mods:/home/steam/custom-mods:ro
       - ${PWD}/..:/host-parent:ro
-    networks:
-      internal: {}
-      macvlan:
-        ipv4_address: ${CONTAINER_IP}
 
   # --- Steam Auth ---
   # Handles Steam login + 2FA for game download via the wizard.
   # Credentials are memory-only — never stored to disk.
-  # Internal network only — never exposed externally.
+  # Port 18700 is intentionally NOT exposed to host.
   stardrop-steam-auth:
     build: ./docker/steam-auth
     image: stardrop-steam-auth:local
@@ -100,30 +94,3 @@ services:
     restart: unless-stopped
     environment:
       - STEAM_AUTH_PORT=18700
-    networks:
-      - internal
-
-# ─── Networks ────────────────────────────────────────────────────────
-#
-# macvlan  — gives stardrop-server its own LAN IP address.
-#            Game port 24642/udp, web panel, VNC are all directly
-#            accessible on CONTAINER_IP with no port mapping or NAT.
-#            Multiple instances can run on the same host — each just
-#            needs a unique CONTAINER_IP.
-#
-# internal — private bridge for inter-container communication.
-#            Manager, init, steam-auth are isolated from the LAN.
-#            stardrop-server reaches them by service name via Docker DNS.
-#
-networks:
-  internal:
-    driver: bridge
-
-  macvlan:
-    driver: macvlan
-    driver_opts:
-      parent: ${HOST_INTERFACE:-eth0}
-    ipam:
-      config:
-        - subnet: ${LAN_SUBNET:-192.168.1.0/24}
-          gateway: ${LAN_GATEWAY:-192.168.1.1}
