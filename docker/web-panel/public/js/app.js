@@ -170,12 +170,8 @@ function wizGoToStep(n) {
   });
   _wizState.currentStep = n;
 
-  // Step 2: auto-check game files on entry
-  if (n === 2) {
-    const hint = sessionStorage.getItem('wizardHint');
-    if (hint === 'local') sessionStorage.removeItem('wizardHint');
-    wizCheckGameFiles();
-  }
+  // Step 2: auto-scan on entry
+  if (n === 2) wizInitStep2();
 
   // Ensure timezone picker is built when step 5 is shown (handles refresh mid-wizard)
   if (n === 5 && !document.getElementById('wiz-tz-picker-search')) {
@@ -194,7 +190,14 @@ function wizSetMethod(method) {
   if (continueRow) continueRow.style.display = method === 'steam' ? 'none' : '';
   const nextBtn = document.getElementById('wiz-step2-next');
   if (nextBtn) nextBtn.disabled = !_wizState._filesFound;
-  if (method === 'local') wizScanInstalls();
+    if (method === 'local') wizScanInstalls();
+}
+
+// Called on step 2 entry — auto-shows the local tab and triggers scan
+function wizInitStep2() {
+  const choiceDiv = document.getElementById('wiz-method-choice');
+  if (choiceDiv) choiceDiv.style.display = 'block';
+  wizSetMethod('local');
 }
 
 // Auto-scan /host-parent for sibling stardrophost installs with game files
@@ -225,39 +228,37 @@ async function wizScanInstalls() {
   listEl.style.display = 'block';
   listEl.innerHTML = `
     <p style="font-size:13px;color:var(--text-secondary);margin:0 0 8px">Found game files in existing installs:</p>
-    ${found.map(i => `
+    ${found.map((i, idx) => `
       <div style="display:flex;align-items:center;justify-content:space-between;padding:8px 10px;background:var(--bg-tertiary);border-radius:6px;margin-bottom:6px">
         <div>
           <div style="font-size:13px;font-weight:500">${escapeHtml(i.name)}</div>
           <div style="font-size:11px;color:var(--text-muted);font-family:monospace">${escapeHtml(i.displayPath)}</div>
         </div>
-        <button class="btn btn-secondary" style="font-size:12px;padding:4px 12px"
-          onclick="wizUseGamePath(${JSON.stringify(i.gamePath)})">Use This</button>
+        <button id="wiz-use-btn-${idx}" class="btn btn-secondary" style="font-size:12px;padding:4px 12px"
+          onclick="wizUseGamePath(${escapeHtml(JSON.stringify(i.gamePath))}, ${idx})">Use This</button>
       </div>
     `).join('')}
   `;
 }
 
 // Register a game path via the wizard step 2 API
-async function wizUseGamePath(gamePath) {
+async function wizUseGamePath(gamePath, btnIdx) {
   const statusEl = document.getElementById('wiz-scan-status');
-  statusEl.style.color = 'var(--text-secondary)';
-  statusEl.textContent = 'Registering…';
+  const btn = btnIdx !== undefined ? document.getElementById(`wiz-use-btn-${btnIdx}`) : null;
+  if (statusEl) { statusEl.style.color = 'var(--text-secondary)'; statusEl.textContent = 'Registering…'; }
   try {
     const data = await API.post('/api/wizard/step/2', { method: 'path', gamePath });
     if (data?.success) {
-      statusEl.style.color = 'var(--accent)';
-      statusEl.textContent = '✅ Game files found and registered!';
+      if (btn) { btn.textContent = '✓ Selected'; btn.disabled = true; btn.style.borderColor = 'var(--accent)'; btn.style.color = 'var(--accent)'; }
+      if (statusEl) { statusEl.style.color = 'var(--accent)'; statusEl.textContent = '✅ Game files registered — click Continue.'; }
       _wizState._filesFound = true;
       _wizState._method = 'path';
       document.getElementById('wiz-step2-next').disabled = false;
     } else {
-      statusEl.style.color = 'var(--accent-error)';
-      statusEl.textContent = '❌ ' + (data?.error || 'Game files not found at that path.');
+      if (statusEl) { statusEl.style.color = 'var(--accent-error)'; statusEl.textContent = '❌ ' + (data?.error || 'Game files not found at that path.'); }
     }
   } catch (e) {
-    statusEl.style.color = 'var(--accent-error)';
-    statusEl.textContent = '❌ ' + (e.message || 'Request failed.');
+    if (statusEl) { statusEl.style.color = 'var(--accent-error)'; statusEl.textContent = '❌ ' + (e.message || 'Request failed.'); }
   }
 }
 

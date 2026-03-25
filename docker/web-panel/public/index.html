@@ -625,10 +625,6 @@
         <h3 style="margin-bottom:4px">Game Files</h3>
         <p style="font-size:13px;color:var(--text-secondary);margin-bottom:16px">StardropHost needs your Stardew Valley game files.</p>
 
-        <!-- Check at top — auto-runs on step entry -->
-        <button class="btn btn-secondary" style="width:100%;margin-bottom:8px" onclick="wizCheckGameFiles()">Check for Game Files</button>
-        <div id="wiz-files-status" style="font-size:13px;text-align:center;min-height:20px;margin-bottom:12px"></div>
-
         <!-- Method choice — shown only when game files are not found -->
         <div id="wiz-method-choice" style="display:none">
           <p style="font-size:13px;color:var(--text-secondary);margin-bottom:10px">Game files not found — choose how to provide them:</p>
@@ -641,11 +637,7 @@
             <!-- Auto-scan: sibling stardrophost installs -->
             <div id="wiz-scan-loading" style="font-size:13px;color:var(--text-muted);margin-bottom:8px">Scanning for existing installs…</div>
             <div id="wiz-scan-list" style="display:none;margin-bottom:12px"></div>
-
-            <!-- Directory browser -->
-            <button class="btn btn-secondary" style="width:100%;margin-bottom:10px" onclick="wizOpenDirBrowser()">Browse for Game Directory…</button>
-
-            <div id="wiz-scan-status" style="font-size:12px;color:var(--text-muted);min-height:16px;margin-bottom:10px"></div>
+            <div id="wiz-scan-status" style="font-size:13px;min-height:20px;margin-bottom:10px"></div>
 
             <!-- Manual copy fallback -->
             <div class="card" style="background:var(--bg-tertiary)">
