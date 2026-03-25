@@ -1176,6 +1176,8 @@ let lastBackupStatus       = null;
 let containerReconnectPoll = null;
 let steamPollInterval      = null;
 let steamLoginVisible      = false;
+let isGameRestarting       = false;
+let gameRestartInitiatedAt = 0;
 
 // ─── Theme ───────────────────────────────────────────────────────
 let currentTheme = (() => {
@@ -1373,9 +1375,18 @@ async function loadDashboard() {
 function updateDashboardUI(data) {
   lastStatusData = data;
 
-  const running     = !!data.gameRunning;
-  const statusText  = running ? 'Running' : 'Stopped';
-  const statusClass = running ? 'online'  : 'offline';
+  const running = !!data.gameRunning;
+
+  // Clear restarting flag once the game comes back up (with a 5s grace period
+  // so we don't clear it before SMAPI has had a chance to actually stop)
+  if (isGameRestarting && running && Date.now() - gameRestartInitiatedAt > 5000) {
+    isGameRestarting = false;
+    showToast('Server is back online', 'success');
+  }
+
+  const restarting  = isGameRestarting && !running;
+  const statusText  = restarting ? 'Restarting...' : running ? 'Running' : 'Stopped';
+  const statusClass = restarting ? 'restarting' : running ? 'online' : 'offline';
 
   setText('stat-status', statusText);
   document.getElementById('stat-status-icon').innerHTML =
@@ -1383,6 +1394,10 @@ function updateDashboardUI(data) {
   document.getElementById('serverStatus').className = `status-badge ${statusClass}`;
   document.getElementById('serverStatus').innerHTML =
     `<span class="status-dot ${statusClass}"></span><span id="serverStatusText">${statusText}</span>`;
+
+  // Disable restart button while restarting
+  const restartBtn = document.querySelector('.btn[onclick="restartServer()"]');
+  if (restartBtn) restartBtn.disabled = restarting;
 
   setText('stat-players', `${data.players?.online ?? 0}/4`);
   setText('stat-uptime',  formatUptime(data.uptime || 0));
@@ -1937,10 +1952,11 @@ async function handleSaveUpload(input) {
 }
 
 async function selectSave(saveName) {
+  if (!confirm(`Switch to save "${saveName}"? The server will restart.`)) return;
   const data = await API.post('/api/saves/select', { saveName });
   if (data?.success) {
-    showToast('Active save updated. Restart the container to apply.', 'success');
     loadSaves();
+    await triggerGameRestart();
   } else {
     showToast(data?.error || 'Failed to select save', 'error');
   }
@@ -2369,11 +2385,21 @@ async function deleteMod(folder, name) {
 }
 
 // ─── Actions ─────────────────────────────────────────────────────
+async function triggerGameRestart() {
+  isGameRestarting       = true;
+  gameRestartInitiatedAt = Date.now();
+  if (lastStatusData) updateDashboardUI(lastStatusData);
+  const data = await API.post('/api/server/restart').catch(() => null);
+  if (!data?.success) {
+    isGameRestarting = false;
+    showToast(data?.error || 'Restart failed', 'error');
+    if (lastStatusData) updateDashboardUI(lastStatusData);
+  }
+}
+
 async function restartServer() {
   if (!confirm('Restart the server?')) return;
-  const data = await API.post('/api/server/restart');
-  showToast(data?.success ? 'Restart initiated' : (data?.error || 'Restart failed'),
-    data?.success ? 'success' : 'error');
+  await triggerGameRestart();
 }
 
 async function createBackup() {

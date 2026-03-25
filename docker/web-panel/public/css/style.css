@@ -197,9 +197,10 @@ body {
   border-radius: 20px;
   font-weight: 600;
 }
-.status-badge.online   { background: rgba(167,139,250,0.15); color: var(--accent); }
-.status-badge.offline  { background: rgba(239,68,68,0.15);   color: var(--accent-error); }
-.status-badge.checking { background: rgba(56,189,248,0.15);  color: var(--accent-info); }
+.status-badge.online      { background: rgba(167,139,250,0.15); color: var(--accent); }
+.status-badge.offline     { background: rgba(239,68,68,0.15);   color: var(--accent-error); }
+.status-badge.checking    { background: rgba(56,189,248,0.15);  color: var(--accent-info); }
+.status-badge.restarting  { background: rgba(245,158,11,0.15);  color: #f59e0b; }
 
 /* ─── Page Container ──────────────────────────────────────────── */
 
@@ -775,6 +776,16 @@ body {
 .status-orb.offline {
   background: var(--accent-error);
   box-shadow: 0 0 0 4px rgba(239,68,68,0.12);
+}
+.status-dot.restarting,
+.status-orb.restarting {
+  background: #f59e0b;
+  box-shadow: 0 0 0 4px rgba(245,158,11,0.15);
+  animation: pulse-restarting 1.2s ease-in-out infinite;
+}
+@keyframes pulse-restarting {
+  0%, 100% { opacity: 1; }
+  50%       { opacity: 0.35; }
 }
 .status-dot.checking,
 .status-orb.checking {
