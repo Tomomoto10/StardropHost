@@ -54,11 +54,11 @@ function getTarGzipArgs(outputPath, sourceBaseDir, sourceNames, verbose) {
 // Secondary:       .selected_save marker (used by save-selector.sh)
 
 function getSelectedSaveName() {
-  // Primary: startup_preferences
+  // Primary: startup_preferences (XML: <saveFolderName>...</saveFolderName>)
   try {
     if (fs.existsSync(STARTUP_PREFS_FILE)) {
       const content = fs.readFileSync(STARTUP_PREFS_FILE, 'utf-8');
-      const match   = content.match(/^saveFolderName\s*=\s*(.+)$/m);
+      const match   = content.match(/<saveFolderName>([^<]+)<\/saveFolderName>/);
       if (match && match[1].trim()) return match[1].trim();
     }
   } catch {}
@@ -83,17 +83,18 @@ function setSelectedSaveName(saveName) {
   const saveDir = path.join(config.SAVES_DIR, saveName);
   if (!fs.existsSync(saveDir)) throw new Error('Selected save does not exist');
 
-  // Write startup_preferences (primary, read by AlwaysOnServer/ServerAutoLoad)
+  // Write startup_preferences (XML: <saveFolderName>, read by AlwaysOnServer/ServerAutoLoad)
   try {
     ensureDir(path.dirname(STARTUP_PREFS_FILE));
     let content = '';
     if (fs.existsSync(STARTUP_PREFS_FILE)) {
       content = fs.readFileSync(STARTUP_PREFS_FILE, 'utf-8');
     }
-    if (content.match(/^saveFolderName\s*=/m)) {
-      content = content.replace(/^saveFolderName\s*=.*$/m, `saveFolderName=${saveName}`);
+    if (content.match(/<saveFolderName>/)) {
+      content = content.replace(/<saveFolderName>[^<]*<\/saveFolderName>/, `<saveFolderName>${saveName}</saveFolderName>`);
     } else {
-      content += `\nsaveFolderName=${saveName}`;
+      // Insert before closing tag
+      content = content.replace('</StartupPreferences>', `  <saveFolderName>${saveName}</saveFolderName>\n</StartupPreferences>`);
     }
     fs.writeFileSync(STARTUP_PREFS_FILE, content, 'utf-8');
   } catch {}
@@ -644,7 +645,7 @@ function deleteSave(req, res) {
         if (fs.existsSync(markerPath)) fs.unlinkSync(markerPath);
         if (fs.existsSync(STARTUP_PREFS_FILE)) {
           const content = fs.readFileSync(STARTUP_PREFS_FILE, 'utf-8')
-            .replace(/^saveFolderName\s*=.*$/m, 'saveFolderName=');
+            .replace(/<saveFolderName>[^<]*<\/saveFolderName>/, '<saveFolderName></saveFolderName>');
           fs.writeFileSync(STARTUP_PREFS_FILE, content, 'utf-8');
         }
       }
