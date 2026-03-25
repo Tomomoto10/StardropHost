@@ -73,7 +73,7 @@ services:
       - "${GAME_PORT:-24642}:24642/udp"
       - "${VNC_PORT:-5900}:5900"
       - "${METRICS_PORT:-9090}:9090"
-      - "${PANEL_PORT:-18642}:18642"
+      - "${PANEL_PORT:-18642}:${PANEL_PORT:-18642}"
     volumes:
       - ./data/saves:/home/steam/.config/StardewValley:rw
       - ./data/game:/home/steam/stardewvalley:rw
