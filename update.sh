@@ -68,6 +68,14 @@ fi
 
 cd "$SCRIPT_DIR" || { echo -e "${RED}[ERR]  Cannot cd to $SCRIPT_DIR${NC}"; exit 1; }
 
+# -- Load .env so compose has all variables before any docker compose command --
+if [ -f "$SCRIPT_DIR/.env" ]; then
+    set -a
+    # shellcheck disable=SC1091
+    source "$SCRIPT_DIR/.env"
+    set +a
+fi
+
 print_header
 print_info "Directory:  $SCRIPT_DIR"
 print_info "Container:  ${CONTAINER_PREFIX}-server"
@@ -312,18 +320,17 @@ fi
 
 print_success "Containers started"
 
-# -- Resolve IP and panel port for the done message --
-LOCAL_IP=$(hostname -I 2>/dev/null | awk '{print $1}')
-if [ -z "$LOCAL_IP" ] && command -v ip &>/dev/null; then
-    LOCAL_IP=$(ip route get 1.1.1.1 2>/dev/null | awk '/src/{for(i=1;i<=NF;i++) if($i=="src"){print $(i+1);exit}}')
+# -- Resolve panel URL for the done message --
+# With macvlan each instance has its own CONTAINER_IP — use that if set
+SERVER_IP="${CONTAINER_IP:-}"
+if [ -z "$SERVER_IP" ]; then
+    SERVER_IP=$(hostname -I 2>/dev/null | awk '{print $1}')
 fi
-SERVER_IP="${LOCAL_IP:-your-server-ip}"
-
-PANEL_PORT="18642"
-if [ -f "$SCRIPT_DIR/.env" ]; then
-    _port=$(grep -E '^PANEL_PORT=' "$SCRIPT_DIR/.env" 2>/dev/null | cut -d= -f2 | tr -d '"' | tr -d "'")
-    [ -n "$_port" ] && PANEL_PORT="$_port"
+if [ -z "$SERVER_IP" ] && command -v ip &>/dev/null; then
+    SERVER_IP=$(ip route get 1.1.1.1 2>/dev/null | awk '/src/{for(i=1;i<=NF;i++) if($i=="src"){print $(i+1);exit}}')
 fi
+SERVER_IP="${SERVER_IP:-your-server-ip}"
+PANEL_PORT="${PANEL_PORT:-18642}"
 
 # -- Done --
 echo ""
