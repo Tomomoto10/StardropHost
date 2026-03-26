@@ -705,7 +705,7 @@
         <!-- Steamcmd Guard row — hidden until STEAM_GUARD_REQUIRED detected in setup.log -->
         <div id="wiz-dl-guard-row" style="display:none;margin-top:14px;border:1px solid var(--accent-warning,#f59e0b);border-radius:6px;padding:14px;background:rgba(245,158,11,0.07)">
           <p style="font-size:13px;color:var(--accent-warning,#f59e0b);margin:0 0 10px;font-weight:500">Steam Guard Required</p>
-          <p style="font-size:12px;color:var(--text-secondary);margin:0 0 10px">Steam requires a second Guard code to download the game files. This is normal — the downloader logs in separately from the initial login step, so Steam sends a new code. Check your email for a new Guard code (it may look identical to the first one).</p>
+          <p style="font-size:12px;color:var(--text-secondary);margin:0 0 10px">Steam requires a Guard code to download the game files. On a new machine this may happen up to twice — Steam sends a fresh code each time. Check your email or authenticator app for the latest code and enter it below.</p>
           <div style="display:flex;gap:8px;align-items:center">
             <input id="wiz-dl-guard-input" class="input" placeholder="Enter Guard code" maxlength="10" style="flex:1;font-size:13px;letter-spacing:0.08em">
             <button class="btn btn-primary" id="wiz-dl-guard-btn" onclick="wizSubmitSteamcmdGuard()">Submit &amp; Retry</button>
