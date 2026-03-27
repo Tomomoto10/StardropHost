@@ -42,7 +42,6 @@ function readRecentLogLines(limit = 400) {
 // Updated regex from [A-Za-z0-9_]+ to [-0-9]+ to match actual IDs
 function extractLogHints() {
   const lines = readRecentLogLines(500);
-  let day = '';
   const connectedPlayers = new Set();
   let paused = false;
 
@@ -55,12 +54,6 @@ function extractLogHints() {
   };
 
   for (const line of lines) {
-    const contextMatch = line.match(/Context:\s+loaded save '.*?', starting ([a-z]+ \d+ Y\d+)/i);
-    if (contextMatch) day = contextMatch[1];
-
-    const seasonMatch = line.match(/Season:\s*([a-z]+, Day \d+, Year \d+)/i);
-    if (seasonMatch) day = seasonMatch[1];
-
     if (/Disconnected:\s*ServerOfflineMode/i.test(line)) {
       paused = true;
       connectedPlayers.clear();
@@ -96,7 +89,7 @@ function extractLogHints() {
     }
   }
 
-  return { day, players: connectedPlayers.size, paused };
+  return { players: connectedPlayers.size, paused };
 }
 
 // -- Network info --
@@ -156,8 +149,8 @@ function collectStatus(req = null) {
     players: { online: 0, max: 4 },
     cpu: 0,
     memory: { used: 0, limit: 2048 },
-    day: 'Unknown',
-    season: 'Unknown',
+    day: null,
+    season: null,
     backupCount: 0,
     modCount: 0,
     scriptsHealthy: false,
@@ -271,7 +264,6 @@ function collectStatus(req = null) {
 
   // -- Fill gaps from SMAPI log hints --
   const hints = extractLogHints();
-  if ((!status.day || status.day === 'Unknown') && hints.day) status.day = hints.day;
   if (status.players.online === 0 && hints.players > 0) status.players.online = hints.players;
   if (hints.paused) status.paused = true;
 
