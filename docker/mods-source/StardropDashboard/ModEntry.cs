@@ -4,6 +4,7 @@ using System.IO;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using HarmonyLib;
+using Steamworks;
 using StardewModdingAPI;
 using StardewModdingAPI.Events;
 using StardewValley;
@@ -23,6 +24,12 @@ namespace StardropDashboard
         // ── Invite code (captured via Harmony hook) ───────────────
         private static string? _cachedInviteCode = null;
         private static ModEntry? _instance = null;
+
+        // ── Steam Game Server (Path B — SDR relay) ───────────────
+        private bool _steamServerInitialized = false;
+        private static readonly bool _steamMode =
+            string.Equals(Environment.GetEnvironmentVariable("SERVER_MODE"), "steam",
+                StringComparison.OrdinalIgnoreCase);
 
         private static readonly JsonSerializerOptions JsonOptions = new()
         {
@@ -106,10 +113,49 @@ namespace StardropDashboard
         {
             // Write an initial offline status immediately on launch
             WriteOffline();
+
+            if (_steamMode)
+                InitSteamGameServer();
+        }
+
+        // ── Steam Game Server init (Path B — anonymous, no credentials) ──
+        private void InitSteamGameServer()
+        {
+            try
+            {
+                bool ok = GameServer.Init(
+                    unIP:           0,
+                    usGamePort:     24642,
+                    usQueryPort:    27015,
+                    eServerMode:    EServerMode.eServerModeAuthenticationAndSecure,
+                    pchVersionString: Game1.version ?? "1.6.15"
+                );
+
+                if (!ok)
+                {
+                    Monitor.Log("Steam Game Server Init returned false — SDR unavailable.", LogLevel.Warn);
+                    return;
+                }
+
+                SteamGameServer.LogOnAnonymous();
+                SteamGameServerNetworkingUtils.InitRelayNetworkAccess();
+                _steamServerInitialized = true;
+                Monitor.Log("Steam Game Server initialized (anonymous). SDR relay active.", LogLevel.Info);
+            }
+            catch (Exception ex)
+            {
+                Monitor.Log($"Steam Game Server init failed (non-fatal): {ex.Message}", LogLevel.Warn);
+            }
         }
 
         private void OnUpdateTicked(object? sender, UpdateTickedEventArgs e)
         {
+            // Pump Steam Game Server callbacks every tick (Path B — must run even before world ready)
+            if (_steamServerInitialized)
+            {
+                try { GameServer.RunCallbacks(); } catch { }
+            }
+
             if (!Context.IsWorldReady) return;
 
             // Keep multiplayer network settings tuned for low latency.

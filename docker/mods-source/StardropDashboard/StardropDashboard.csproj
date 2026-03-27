@@ -14,4 +14,11 @@
     <PackageReference Include="Pathoschild.Stardew.ModBuildConfig" Version="4.*" />
   </ItemGroup>
 
+  <ItemGroup>
+    <!-- Steamworks.NET — for Steam Game Server SDK (Path B: Steam SDR invite codes) -->
+    <Reference Include="Steamworks.NET">
+      <HintPath>$(GamePath)\Steamworks.NET.dll</HintPath>
+    </Reference>
+  </ItemGroup>
+
 </Project>
