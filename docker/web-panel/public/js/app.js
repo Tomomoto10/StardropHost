@@ -1367,23 +1367,23 @@ function handleWsMessage(msg) {
 // ─── Quick Actions ───────────────────────────────────────────────
 
 const QUICK_ACTION_DEFS = {
-  'restart-server': { label: 'Restart Server',  icon: 'icon-refresh',  cls: 'btn-warning',   onclick: 'restartServer()' },
-  'stop-server':    { label: 'Stop Server',      icon: 'icon-screen',   cls: 'btn-danger',    onclick: 'stopServer()' },
-  'start-server':   { label: 'Start Server',     icon: 'icon-refresh',  cls: 'btn-success',   onclick: 'startServer()' },
-  'backup-now':     { label: 'Backup Now',        icon: 'icon-saves',    cls: 'btn-success',   onclick: 'createBackup()' },
-  'view-logs':      { label: 'View Logs',         icon: 'icon-logs',     cls: 'btn-primary',   onclick: "navigateTo('logs')" },
-  'farm-overview':  { label: 'Farm Overview',     icon: 'icon-sprout',   cls: 'btn-secondary', onclick: "navigateTo('farm')" },
-  'manage-players': { label: 'Manage Players',    icon: 'icon-players',  cls: 'btn-secondary', onclick: "navigateTo('players')" },
-  'manage-saves':   { label: 'Manage Saves',      icon: 'icon-saves',    cls: 'btn-secondary', onclick: "navigateTo('saves')" },
-  'manage-mods':    { label: 'Manage Mods',       icon: 'icon-mods',     cls: 'btn-secondary', onclick: "navigateTo('mods')" },
-  'open-terminal':  { label: 'Open Terminal',     icon: 'icon-terminal', cls: 'btn-secondary', onclick: "navigateTo('terminal')" },
-  'open-config':    { label: 'Open Config',       icon: 'icon-config',   cls: 'btn-secondary', onclick: "navigateTo('config')" },
+  'restart-server': { label: 'Restart Server',    icon: 'icon-refresh',  cls: 'btn-warning',   onclick: 'restartServer()' },
+  'toggle-server':  { label: 'Start/Stop Server', icon: 'icon-refresh',  cls: 'btn-secondary', onclick: 'toggleServer()' },
+  'backup-now':     { label: 'Backup Now',         icon: 'icon-saves',    cls: 'btn-success',   onclick: 'createBackup()' },
+  'view-logs':      { label: 'View Logs',          icon: 'icon-logs',     cls: 'btn-primary',   onclick: "navigateTo('logs')" },
+  'farm-overview':  { label: 'Farm Overview',      icon: 'icon-sprout',   cls: 'btn-secondary', onclick: "navigateTo('farm')" },
+  'manage-players': { label: 'Manage Players',     icon: 'icon-players',  cls: 'btn-secondary', onclick: "navigateTo('players')" },
+  'manage-saves':   { label: 'Manage Saves',       icon: 'icon-saves',    cls: 'btn-secondary', onclick: "navigateTo('saves')" },
+  'manage-mods':    { label: 'Manage Mods',        icon: 'icon-mods',     cls: 'btn-secondary', onclick: "navigateTo('mods')" },
+  'open-terminal':  { label: 'Open Terminal',      icon: 'icon-terminal', cls: 'btn-secondary', onclick: "navigateTo('terminal')" },
+  'open-config':    { label: 'Open Config',        icon: 'icon-config',   cls: 'btn-secondary', onclick: "navigateTo('config')" },
 };
 
 const QUICK_ACTIONS_KEY     = 'stardrop_quick_actions';
 const QUICK_ACTIONS_DEFAULT = ['restart-server', 'backup-now'];
 
 let quickActionsEditMode = false;
+let qasDragSrcId        = null;
 
 function getQuickActions() {
   try {
@@ -1397,14 +1397,28 @@ function saveQuickActions(ids) {
   localStorage.setItem(QUICK_ACTIONS_KEY, JSON.stringify(ids));
 }
 
+function _qaButtonDef(id) {
+  if (id === 'toggle-server') {
+    const running = !!(lastStatusData?.gameRunning);
+    return running
+      ? { label: 'Stop Server',  icon: 'icon-screen',  cls: 'btn-danger',  onclick: 'stopServer()' }
+      : { label: 'Start Server', icon: 'icon-refresh', cls: 'btn-success', onclick: 'startServer()' };
+  }
+  return QUICK_ACTION_DEFS[id];
+}
+
 function renderQuickActions() {
+  if (qasDragSrcId) return; // don't interrupt active drag
   const container = document.getElementById('quickActionsContainer');
   if (!container) return;
-  const ids = getQuickActions().filter(id => QUICK_ACTION_DEFS[id]);
+  const ids       = getQuickActions().filter(id => QUICK_ACTION_DEFS[id]);
   const editClass = quickActionsEditMode ? ' editing' : '';
   container.innerHTML = ids.map(id => {
-    const def = QUICK_ACTION_DEFS[id];
-    return `<div class="quick-action-wrap${editClass}">
+    const def = _qaButtonDef(id);
+    const drag = `draggable="true" data-qaid="${id}"
+      ondragstart="onQADragStart(event)" ondragover="onQADragOver(event)"
+      ondrop="onQADrop(event)" ondragend="onQADragEnd(event)"`;
+    return `<div class="quick-action-wrap${editClass}" ${drag}>
       <button class="btn ${def.cls}" type="button" onclick="${quickActionsEditMode ? '' : def.onclick}">
         <svg class="icon"><use href="#${def.icon}"></use></svg>${escapeHtml(def.label)}
       </button>
@@ -1412,12 +1426,43 @@ function renderQuickActions() {
     </div>`;
   }).join('') +
   `<button class="btn btn-secondary quick-action-add" type="button" onclick="openQuickActionsModal()" title="Add quick action">+</button>` +
-  `<button class="btn btn-secondary quick-action-add" type="button" onclick="toggleQuickActionsEditMode()" title="${quickActionsEditMode ? 'Done' : 'Remove quick actions'}">${quickActionsEditMode ? 'Done' : '−'}</button>`;
+  `<button class="btn btn-secondary quick-action-add" type="button" onclick="toggleQuickActionsEditMode()" title="${quickActionsEditMode ? 'Done' : 'Remove quick actions'}">${quickActionsEditMode ? '✓' : '−'}</button>`;
 }
 
 function toggleQuickActionsEditMode() {
   quickActionsEditMode = !quickActionsEditMode;
   renderQuickActions();
+}
+
+// ── Drag-to-reorder ──────────────────────────────────────────────
+function onQADragStart(e) {
+  qasDragSrcId = e.currentTarget.dataset.qaid;
+  e.currentTarget.classList.add('dragging');
+  e.dataTransfer.effectAllowed = 'move';
+}
+function onQADragOver(e) {
+  e.preventDefault();
+  e.dataTransfer.dropEffect = 'move';
+  document.querySelectorAll('.quick-action-wrap').forEach(el => el.classList.remove('drag-over'));
+  if (e.currentTarget.dataset.qaid !== qasDragSrcId) e.currentTarget.classList.add('drag-over');
+}
+function onQADrop(e) {
+  e.preventDefault();
+  const targetId = e.currentTarget.dataset.qaid;
+  if (!targetId || targetId === qasDragSrcId) return;
+  const ids    = getQuickActions();
+  const srcIdx = ids.indexOf(qasDragSrcId);
+  const tgtIdx = ids.indexOf(targetId);
+  if (srcIdx === -1 || tgtIdx === -1) return;
+  ids.splice(srcIdx, 1);
+  ids.splice(tgtIdx, 0, qasDragSrcId);
+  saveQuickActions(ids);
+  qasDragSrcId = null;
+  renderQuickActions();
+}
+function onQADragEnd() {
+  document.querySelectorAll('.quick-action-wrap').forEach(el => el.classList.remove('dragging', 'drag-over'));
+  qasDragSrcId = null;
 }
 
 function addQuickAction(id) {
@@ -1472,6 +1517,7 @@ async function loadDashboard() {
 
 function updateDashboardUI(data) {
   lastStatusData = data;
+  renderQuickActions();
 
   const gameRunning = !!data.gameRunning;
   const liveRunning = data.live?.serverState === 'running';
@@ -2114,19 +2160,18 @@ async function loadConfig() {
       card.appendChild(row);
     }
 
-    // Server group: append Start / Stop / Restart controls
+    // Server group: append Start/Stop toggle + Restart controls
     if (group.name === 'Server') {
       const sep = document.createElement('div');
       sep.style.cssText = 'border-top:1px solid var(--border);margin:14px 0 10px';
       card.appendChild(sep);
+      const running = !!(lastStatusData?.gameRunning);
       const actions = document.createElement('div');
       actions.className = 'action-buttons';
       actions.innerHTML =
-        `<button class="btn btn-success btn-sm" type="button" onclick="startServer()">
-           <svg class="icon"><use href="#icon-refresh"></use></svg>Start
-         </button>
-         <button class="btn btn-sm" style="color:#ef4444;border-color:#ef4444" type="button" onclick="stopServer()">
-           <svg class="icon"><use href="#icon-screen"></use></svg>Stop
+        `<button id="serverToggleBtn" class="btn btn-sm ${running ? 'btn-danger' : 'btn-success'}" type="button"
+           onclick="${running ? 'stopServer()' : 'startServer()'}">
+           ${running ? 'Stop Server' : 'Start Server'}
          </button>
          <button class="btn btn-warning btn-sm" type="button" onclick="restartServer()">
            <svg class="icon"><use href="#icon-refresh"></use></svg>Restart
@@ -2373,15 +2418,29 @@ async function restartServer() {
 
 async function startServer() {
   const data = await API.post('/api/server/start').catch(() => null);
-  if (data?.success) showToast('Server starting...', 'success');
+  if (data?.success) { showToast('Server starting...', 'success'); renderQuickActions(); updateServerToggleBtn(); }
   else showToast(data?.error || 'Failed to start server', 'error');
 }
 
 async function stopServer() {
   if (!confirm('Stop the server? Players will be disconnected.')) return;
   const data = await API.post('/api/server/stop').catch(() => null);
-  if (data?.success) showToast('Server stopped', 'success');
+  if (data?.success) { showToast('Server stopped', 'success'); renderQuickActions(); updateServerToggleBtn(); }
   else showToast(data?.error || 'Failed to stop server', 'error');
+}
+
+async function toggleServer() {
+  if (lastStatusData?.gameRunning) await stopServer();
+  else await startServer();
+}
+
+function updateServerToggleBtn() {
+  const btn = document.getElementById('serverToggleBtn');
+  if (!btn) return;
+  const running = !!(lastStatusData?.gameRunning);
+  btn.textContent = running ? 'Stop Server' : 'Start Server';
+  btn.className   = `btn btn-sm ${running ? 'btn-danger' : 'btn-success'}`;
+  btn.onclick     = running ? stopServer : startServer;
 }
 
 async function createBackup() {
