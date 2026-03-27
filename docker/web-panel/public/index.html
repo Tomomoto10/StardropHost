@@ -294,6 +294,8 @@
         </button>
         <h2 id="pageTitle">Dashboard</h2>
         <div class="topbar-right">
+          <button id="saveConfigBtn" class="btn btn-success btn-sm" onclick="saveConfig()" style="display:none">Save Changes</button>
+          <span id="pendingRestartBadge" class="status-badge restarting" style="display:none;cursor:pointer" onclick="showRestartModal('Restart the container to apply your saved changes.')" title="Click to restart">⚠ Restart Pending</span>
           <span id="serverStatus" class="status-badge checking">
             <span class="status-dot" aria-hidden="true"></span>
             <span id="serverStatusText">Checking...</span>

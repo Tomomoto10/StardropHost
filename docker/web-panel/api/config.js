@@ -14,8 +14,6 @@ const config = require('../server');
 const CONFIG_SCHEMA = {
   'Server': [
     { key: 'SERVER_PASSWORD',  label: 'Server Password',  type: 'password', viewable: true, default: '' },
-    { key: 'PUBLIC_IP',        label: 'Public Join IP',    type: 'text',     default: '',
-      description: 'Shown to players on the join screen. Leave blank to auto-detect.' },
   ],
   'VNC & Display': [
     { key: 'VNC_PASSWORD',      label: 'VNC Password',             type: 'password', viewable: true, default: 'stardew1', maxLength: 8 },

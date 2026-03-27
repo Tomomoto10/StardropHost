@@ -2012,10 +2012,6 @@ async function loadConfig() {
     }
   }
 
-  const saveRow = document.createElement('div');
-  saveRow.style.textAlign = 'right';
-  saveRow.innerHTML = `<button class="btn btn-success" id="saveConfigBtn" onclick="saveConfig()" style="display:none">Save Changes</button>`;
-  container.appendChild(saveRow);
 }
 
 function configChanged() {
@@ -2114,9 +2110,6 @@ async function loadVnc() {
         : `<button class="btn btn-sm btn-success" onclick="vncEnable()">Start VNC Now</button>`}
     </div>
     <div class="config-group" style="margin-top:8px">${cfgRows}</div>
-    <div style="text-align:right;margin-top:10px">
-      <button class="btn btn-success btn-sm" id="saveConfigBtn" onclick="saveConfig()" style="display:none">Save Changes</button>
-    </div>
   `;
 }
 
@@ -2286,6 +2279,13 @@ function showRestartModal(message) {
 
 function closeRestartModal() {
   document.getElementById('restartModal').style.display = 'none';
+  const badge = document.getElementById('pendingRestartBadge');
+  if (badge) badge.style.display = '';
+}
+
+function clearPendingRestart() {
+  const badge = document.getElementById('pendingRestartBadge');
+  if (badge) badge.style.display = 'none';
 }
 
 // ─── Factory Reset Modal ──────────────────────────────────────────
@@ -2357,6 +2357,7 @@ async function confirmRestart() {
 
 function startContainerReconnectPolling() {
   closeRestartModal();
+  clearPendingRestart();
   if (containerReconnectPoll) clearInterval(containerReconnectPoll);
   const startedAt = Date.now();
   containerReconnectPoll = setInterval(async () => {
