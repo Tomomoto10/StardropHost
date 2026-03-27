@@ -110,11 +110,12 @@ async function logout(req, res) {
 
 async function getInviteCode(req, res) {
   // Invite code is written by the ServerDashboard SMAPI mod via Game1.server.getInviteCode()
+  const serverMode = (process.env.SERVER_MODE || 'lan').toLowerCase();
 
   // 1. Try dedicated invite-code file (written immediately when code is generated)
   try {
     const code = fs.readFileSync('/tmp/invite-code.txt', 'utf-8').trim();
-    if (code) return res.json({ inviteCode: code });
+    if (code) return res.json({ inviteCode: code, serverMode });
   } catch {}
 
   // 2. Fall back to live-status.json
@@ -122,11 +123,11 @@ async function getInviteCode(req, res) {
     const liveFile = process.env.LIVE_FILE || '/home/steam/.local/share/stardrop/live-status.json';
     if (fs.existsSync(liveFile)) {
       const live = JSON.parse(fs.readFileSync(liveFile, 'utf-8'));
-      if (live.inviteCode) return res.json({ inviteCode: live.inviteCode });
+      if (live.inviteCode) return res.json({ inviteCode: live.inviteCode, serverMode });
     }
   } catch {}
 
-  res.json({ inviteCode: null });
+  res.json({ inviteCode: null, serverMode });
 }
 
 module.exports = { getStatus, login, submitGuardCode, logout, getInviteCode };

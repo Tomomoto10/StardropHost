@@ -1237,6 +1237,7 @@ function init() {
   setupNavigation();
   setupWebSocket();
   loadDashboard();
+  loadSteam();
   loadBackupStatus();
 
   document.getElementById('logoutBtn').onclick = () => {
@@ -1311,7 +1312,7 @@ function navigateTo(page) {
   document.getElementById('sidebar').classList.remove('open');
 
   switch (page) {
-    case 'dashboard': loadDashboard();                                      break;
+    case 'dashboard': loadDashboard(); loadSteam();                          break;
     case 'farm':      loadFarm();                                            break;
     case 'players':   loadPlayers();                                         break;
     case 'saves':     loadSaves();                                           break;
@@ -1433,24 +1434,30 @@ function updateDashboardUI(data) {
 
 async function loadSteam() {
   const data = await API.get('/api/steam/invitecode').catch(() => null);
-  renderSteamPanel(data?.inviteCode || null);
+  renderSteamPanel(data?.inviteCode || null, data?.serverMode || 'lan');
 }
 
-function renderSteamPanel(inviteCode) {
+function renderSteamPanel(inviteCode, serverMode) {
   const panel   = document.getElementById('steamPanel');
   const card    = document.getElementById('steamCard');
   const titleEl = document.getElementById('steamCardTitle');
   if (!panel) return;
 
   if (card) card.style.display = '';
-  if (titleEl) titleEl.textContent = 'Invite Code';
 
-  if (inviteCode) {
+  const isLan = !serverMode || serverMode === 'lan';
+
+  if (isLan) {
+    if (titleEl) titleEl.textContent = 'Server Mode';
+    panel.innerHTML = `<div style="color:var(--text-secondary);font-size:13px">LAN — Use 'Join IP' in co-op game on a Local Network or VPN Tunnel.</div>`;
+  } else if (inviteCode) {
+    if (titleEl) titleEl.textContent = 'Invite Code';
     panel.innerHTML = `
       <div class="detail-label" style="margin-bottom:4px">Share this code with friends</div>
       <div class="detail-value steam-invite-code-value" style="font-family:monospace;letter-spacing:1px;font-size:15px;margin:4px 0">${escapeHtml(inviteCode)}</div>
       <div class="detail-note">Stardew Valley → Co-op → Enter Invite Code</div>`;
   } else {
+    if (titleEl) titleEl.textContent = 'Invite Code';
     panel.innerHTML = `<div style="color:var(--text-muted);font-size:13px">Waiting for a multiplayer session to start...</div>`;
   }
 }

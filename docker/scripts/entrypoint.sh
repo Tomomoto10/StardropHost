@@ -459,7 +459,9 @@ log_step "Step 3.55: Building AutoHideHost mod..."
 AHH_SRC="/home/steam/mod-source/AutoHideHost"
 AHH_DEST="/home/steam/preinstalled-mods/AutoHideHost"
 
-if [ -d "$AHH_SRC" ]; then
+if [ -f "$AHH_DEST/AutoHideHost.dll" ]; then
+    log_info "✅ AutoHideHost already built"
+elif [ -d "$AHH_SRC" ]; then
     log_info "Building AutoHideHost against game files..."
     dotnet build "$AHH_SRC" -c Release \
         /p:GamePath=/home/steam/stardewvalley \
@@ -489,7 +491,9 @@ log_step "Step 3.6: Building StardropGameManager mod..."
 SGM_SRC="/home/steam/mod-source/StardropGameManager"
 SGM_DEST="/home/steam/preinstalled-mods/StardropGameManager"
 
-if [ -d "$SGM_SRC" ]; then
+if [ -f "$SGM_DEST/StardropGameManager.dll" ]; then
+    log_info "✅ StardropGameManager already built"
+elif [ -d "$SGM_SRC" ]; then
     log_info "Building StardropGameManager against game files..."
     dotnet build "$SGM_SRC" -c Release \
         /p:GamePath=/home/steam/stardewvalley \
