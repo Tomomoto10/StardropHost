@@ -1740,6 +1740,7 @@ function stopSteamPolling() {
 // container restart. User can skip to proceed without an invite code.
 
 let _steamModalPollInterval = null;
+let _steamModalLastState   = null;
 
 async function checkSteamAuthRequired() {
   const [authData, codeData] = await Promise.all([
@@ -1764,6 +1765,7 @@ function dismissSteamModal() {
   const modal = document.getElementById('steamAuthModal');
   if (modal) modal.style.display = 'none';
   _stopSteamModalPolling();
+  _steamModalLastState = null;
   loadSteam();  // refresh the inline card in dashboard / config
 }
 
@@ -1861,6 +1863,10 @@ async function _cancelSteamModalLogin() {
 
 async function _pollSteamModal() {
   const authData = await API.get('/api/steam/status').catch(() => null);
+  const newState = authData?.state || 'unavailable';
+  // Don't re-render while user is typing — only update when state actually changes
+  if (newState === _steamModalLastState) return;
+  _steamModalLastState = newState;
   _renderSteamModal(authData);
 }
 
