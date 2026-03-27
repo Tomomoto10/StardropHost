@@ -23,41 +23,33 @@ namespace StardropDashboard
 {
     public class ModEntry : Mod
     {
-        // ── Galaxy / Steam constants (Stardew Valley's registered credentials) ──
+        // ── Galaxy credentials (Stardew Valley's registered values) ──
         private const string GalaxyClientId     = "48767653913349277";
         private const string GalaxyClientSecret = "58be5c2e55d7f535cf8c4b6bbc09d185de90b152c8c42703cc13502465f0d04a";
         private const string ServerName         = "StardropHost";
 
-        // ── Config ────────────────────────────────────────────────
+        // ── Config ─────────────────────────────────────────────────
         private ModConfig Config = null!;
 
-        // ── State ─────────────────────────────────────────────────
-        private double _secondsSinceLastWrite       = 0;
-        private double _secondsSinceLastGalaxyRetry = 0;
+        // ── Dashboard write timers ──────────────────────────────────
+        private double _secondsSinceLastWrite = 0;
+        private double _secondsSinceRetry     = 0;
         private string _outputPath = "";
 
-        // ── Static ref — needed by Harmony postfixes ──────────────
-        private static ModEntry? _instance  = null;
-        private static IModHelper? _helper  = null;
+        // ── Static refs for Harmony patches ────────────────────────
+        private static ModEntry?   _instance = null;
+        private static IModHelper? _helper   = null;
 
-        // ── Invite code ───────────────────────────────────────────
+        // ── Invite code ─────────────────────────────────────────────
         private static string? _cachedInviteCode = null;
 
-        // ── Steam Game Server ─────────────────────────────────────
-        private static bool     _steamInitialized = false;
-        private static CSteamID _serverSteamId;
-        private static Callback<SteamServersConnected_t>?    _cbConnected;
-        private static Callback<SteamServerConnectFailure_t>? _cbConnectFail;
-        private static Callback<SteamServersDisconnected_t>?  _cbDisconnected;
+        // ── Galaxy init state ───────────────────────────────────────
+        private static bool _galaxyInitComplete = false;
+        private static bool _galaxySignedIn     = false;
+        private static IAuthListener?                    _authListener        = null;
+        private static IOperationalStateChangeListener?  _stateChangeListener = null;
 
-        // ── Galaxy init (deferred until Steam ID arrives) ─────────
-        private static bool                            _galaxyInitComplete  = false;
-        private static bool                            _galaxySignedIn      = false;
-        private static SteamHelper?                    _pendingSteamHelper  = null;
-        private static IAuthListener?                  _authListener        = null;
-        private static IOperationalStateChangeListener? _stateChangeListener = null;
-
-        // ── HTTP client for /steam/app-ticket ─────────────────────
+        // ── HTTP client for app-ticket endpoint ─────────────────────
         private static readonly HttpClient _http = new() { Timeout = TimeSpan.FromSeconds(30) };
         private static readonly string _steamAuthUrl =
             (Environment.GetEnvironmentVariable("STEAM_AUTH_URL") ?? "").TrimEnd('/');
@@ -69,39 +61,34 @@ namespace StardropDashboard
             WriteIndented          = true,
         };
 
-        // ── Entry point ───────────────────────────────────────────
+        // ── Entry ───────────────────────────────────────────────────
         public override void Entry(IModHelper helper)
         {
             _instance = this;
             _helper   = helper;
-
             Config      = helper.ReadConfig<ModConfig>();
             _outputPath = ResolveOutputPath();
             Directory.CreateDirectory(_outputPath);
 
-            helper.Events.GameLoop.UpdateTicked    += OnUpdateTicked;
             helper.Events.GameLoop.GameLaunched    += OnGameLaunched;
             helper.Events.GameLoop.SaveLoaded      += OnSaveLoaded;
+            helper.Events.GameLoop.UpdateTicked    += OnUpdateTicked;
             helper.Events.GameLoop.ReturnedToTitle += (_, _) => WriteOffline();
             helper.Events.GameLoop.DayEnding       += (_, _) => GC.Collect();
 
             var harmony = new Harmony(ModManifest.UniqueID);
 
-            // Patch 1 — GalaxySocket.GetInviteCode: capture invite code the moment Galaxy generates it
+            // GalaxySocket.GetInviteCode — capture invite code the moment Galaxy generates it
             try
             {
                 harmony.Patch(
                     original: AccessTools.Method(typeof(GalaxySocket), nameof(GalaxySocket.GetInviteCode)),
                     postfix:  new HarmonyMethod(typeof(ModEntry), nameof(GalaxySocket_GetInviteCode_Postfix))
                 );
-                Monitor.Log("Invite code hook applied.", LogLevel.Trace);
             }
-            catch (Exception ex)
-            {
-                Monitor.Log($"Invite code hook failed (non-fatal): {ex.Message}", LogLevel.Warn);
-            }
+            catch (Exception ex) { Monitor.Log($"GetInviteCode patch failed: {ex.Message}", LogLevel.Warn); }
 
-            // Patches 2-4 — SteamHelper: redirect Client API calls to GameServer API
+            // SteamHelper — redirect Client API calls to GameServer mode
             try
             {
                 harmony.Patch(
@@ -116,51 +103,34 @@ namespace StardropDashboard
                     original: AccessTools.Method(typeof(SteamHelper), nameof(SteamHelper.Shutdown)),
                     prefix:   new HarmonyMethod(typeof(ModEntry), nameof(SteamHelper_Shutdown_Prefix))
                 );
-                Monitor.Log("SteamHelper patches applied.", LogLevel.Trace);
             }
-            catch (Exception ex)
-            {
-                Monitor.Log($"SteamHelper patches failed (non-fatal): {ex.Message}", LogLevel.Warn);
-            }
+            catch (Exception ex) { Monitor.Log($"SteamHelper patches failed: {ex.Message}", LogLevel.Warn); }
 
-            // Patch 5 — SteamNetServer.initialize: skip (uses Client-only SteamMatchmaking.CreateLobby)
+            // SteamNetServer.initialize — skip (uses Steam Client API, incompatible with GameServer mode)
             try
             {
                 var steamNetServerType = AccessTools.TypeByName("StardewValley.SDKs.Steam.SteamNetServer");
                 if (steamNetServerType != null)
-                {
                     harmony.Patch(
                         original: AccessTools.Method(steamNetServerType, "initialize"),
                         prefix:   new HarmonyMethod(typeof(ModEntry), nameof(SteamNetServer_Initialize_Prefix))
                     );
-                    Monitor.Log("SteamNetServer.initialize patched (skip).", LogLevel.Trace);
-                }
             }
-            catch (Exception ex)
-            {
-                Monitor.Log($"SteamNetServer patch failed (non-fatal): {ex.Message}", LogLevel.Warn);
-            }
+            catch (Exception ex) { Monitor.Log($"SteamNetServer patch failed: {ex.Message}", LogLevel.Warn); }
 
-            // Patches 6-7 — Fake Steam Client API calls that crash in GameServer mode
-            // The game calls SteamUser.GetSteamID() and SteamFriends.GetPersonaName() in
-            // various places even after we skip SteamHelper.Initialize. Without patching them,
-            // they throw because SteamAPI.Init() was never called.
+            // SteamUser/SteamFriends — fake out Steam Client API calls that crash without SteamAPI.Init()
             try
             {
                 harmony.Patch(
-                    original: AccessTools.Method(typeof(Steamworks.SteamUser), nameof(Steamworks.SteamUser.GetSteamID)),
+                    original: AccessTools.Method(typeof(SteamUser), nameof(SteamUser.GetSteamID)),
                     prefix:   new HarmonyMethod(typeof(ModEntry), nameof(SteamUser_GetSteamID_Prefix))
                 );
                 harmony.Patch(
-                    original: AccessTools.Method(typeof(Steamworks.SteamFriends), nameof(Steamworks.SteamFriends.GetPersonaName)),
+                    original: AccessTools.Method(typeof(SteamFriends), nameof(SteamFriends.GetPersonaName)),
                     prefix:   new HarmonyMethod(typeof(ModEntry), nameof(SteamFriends_GetPersonaName_Prefix))
                 );
-                Monitor.Log("SteamUser/SteamFriends patches applied.", LogLevel.Trace);
             }
-            catch (Exception ex)
-            {
-                Monitor.Log($"SteamUser/SteamFriends patches failed (non-fatal): {ex.Message}", LogLevel.Warn);
-            }
+            catch (Exception ex) { Monitor.Log($"SteamUser/SteamFriends patches failed: {ex.Message}", LogLevel.Warn); }
 
             helper.ConsoleCommands.Add(
                 "dashboard_status",
@@ -171,257 +141,181 @@ namespace StardropDashboard
             Monitor.Log($"StardropDashboard ready. Output: {_outputPath}", LogLevel.Info);
         }
 
-        // ── SaveLoaded — retry ticket fetch if not yet signed in ──
-        // Galaxy only creates the lobby when the save loads, so this is the last
-        // moment to sign in and still get an invite code. The user may have logged
-        // into steam-auth after the server started but before loading the save.
-        private void OnSaveLoaded(object? sender, SaveLoadedEventArgs e)
-        {
-            ForceWrite();
-
-            if (_galaxyInitComplete && !_galaxySignedIn && !string.IsNullOrEmpty(_steamAuthUrl))
-            {
-                Monitor.Log("SaveLoaded — retrying Galaxy sign-in (user may have logged in since server started).", LogLevel.Info);
-                Task.Run(() => FetchTicketAndSignIn(null));
-            }
-        }
-
-        // ── GameLaunched — init Steam Game Server (anonymous) ─────
+        // ── GameLaunched ────────────────────────────────────────────
+        // Get SteamHelper directly via Program.sdk — don't wait for SteamHelper.Initialize
+        // since the game may have already called it before our patches were registered.
         private void OnGameLaunched(object? sender, GameLaunchedEventArgs e)
         {
             WriteOffline();
-            InitSteamGameServer();
-        }
-
-        private void InitSteamGameServer()
-        {
-            try
+            var sdk = GetCurrentSdk();
+            if (sdk is SteamHelper steamHelper)
             {
-                // Register callbacks before Init so we don't miss the Connected event
-                _cbConnected    = Callback<SteamServersConnected_t>.CreateGameServer(OnSteamServersConnected);
-                _cbConnectFail  = Callback<SteamServerConnectFailure_t>.CreateGameServer(OnSteamServersConnectFailure);
-                _cbDisconnected = Callback<SteamServersDisconnected_t>.CreateGameServer(OnSteamServersDisconnected);
-
-                bool ok = GameServer.Init(
-                    unIP:             0,
-                    usGamePort:       24642,
-                    usQueryPort:      27015,
-                    eServerMode:      EServerMode.eServerModeAuthenticationAndSecure,
-                    pchVersionString: Game1.version ?? "1.6.15"
-                );
-
-                if (!ok)
-                {
-                    Monitor.Log("GameServer.Init() returned false — invite codes unavailable.", LogLevel.Warn);
-                    return;
-                }
-
-                Steamworks.SteamGameServer.SetProduct("Stardew Valley");
-                Steamworks.SteamGameServer.SetGameDescription("Stardew Valley Dedicated Server");
-                Steamworks.SteamGameServer.SetDedicatedServer(true);
-                Steamworks.SteamGameServer.SetMaxPlayerCount(8);
-                Steamworks.SteamGameServer.LogOnAnonymous();
-                SteamGameServerNetworkingUtils.InitRelayNetworkAccess();
-
-                _steamInitialized = true;
-                Monitor.Log("Steam GameServer initialized (anonymous). Waiting for Steam ID...", LogLevel.Info);
+                Monitor.Log("Obtained SteamHelper via Program.sdk.", LogLevel.Debug);
+                PerformGalaxyInit(steamHelper);
             }
-            catch (Exception ex)
-            {
-                Monitor.Log($"Steam GameServer init failed (non-fatal): {ex.Message}", LogLevel.Warn);
-            }
-        }
-
-        // ── Steam server callbacks ────────────────────────────────
-        private static void OnSteamServersConnected(SteamServersConnected_t _)
-        {
-            _serverSteamId = Steamworks.SteamGameServer.GetSteamID();
-            _instance?.Monitor.Log($"Steam GameServer connected. Server ID: {_serverSteamId.m_SteamID}", LogLevel.Info);
-
-            // Complete Galaxy init if SteamHelper.Initialize already fired (race condition)
-            if (_pendingSteamHelper != null && !_galaxyInitComplete)
-                _instance?.PerformGalaxyInit(_pendingSteamHelper);
-        }
-
-        private static void OnSteamServersConnectFailure(SteamServerConnectFailure_t cb)
-        {
-            _instance?.Monitor.Log($"Steam GameServer connect failed: {cb.m_eResult}", LogLevel.Warn);
-        }
-
-        private static void OnSteamServersDisconnected(SteamServersDisconnected_t cb)
-        {
-            _instance?.Monitor.Log($"Steam GameServer disconnected: {cb.m_eResult}", LogLevel.Warn);
-        }
-
-        // ── Harmony: SteamHelper.Initialize prefix ────────────────
-        // Replaces SteamAPI.Init() with GameServer mode so the game uses Steam networking
-        private static bool SteamHelper_Initialize_Prefix(SteamHelper __instance)
-        {
-            _instance?.Monitor.Log("SteamHelper.Initialize — GameServer mode.", LogLevel.Debug);
-            SetSteamActive(__instance, true);
-
-            if (_steamInitialized && _serverSteamId.IsValid())
-                _instance?.PerformGalaxyInit(__instance);  // Steam ID already here
             else
-                _pendingSteamHelper = __instance;           // Store for OnSteamServersConnected
-
-            return false; // skip original
-        }
-
-        // ── Harmony: SteamHelper.Update prefix ───────────────────
-        // Replaces SteamAPI.RunCallbacks() with GameServer + Galaxy callbacks
-        private static bool SteamHelper_Update_Prefix(SteamHelper __instance)
-        {
-            if (_helper == null) return false;
-            bool active = _helper.Reflection.GetField<bool>(__instance, "active").GetValue();
-            if (active)
             {
-                if (_steamInitialized)
-                    try { GameServer.RunCallbacks(); } catch { }
-                if (_galaxyInitComplete)
-                    try { GalaxyInstance.ProcessData(); } catch { }
+                Monitor.Log("Could not get SteamHelper from Program.sdk.", LogLevel.Warn);
             }
-            Game1.game1.IsMouseVisible = Game1.paused || Game1.options.hardwareCursor;
-            return false; // skip original
         }
 
-        // ── Harmony: SteamHelper.Shutdown prefix ─────────────────
-        private static bool SteamHelper_Shutdown_Prefix()
+        // ── SaveLoaded ──────────────────────────────────────────────
+        // User may have logged into steam-auth between server start and save load — retry immediately.
+        private void OnSaveLoaded(object? sender, SaveLoadedEventArgs e)
         {
-            _instance?.Monitor.Log("SteamHelper.Shutdown — GameServer mode.", LogLevel.Debug);
-            _cachedInviteCode    = null;
-            _galaxySignedIn      = false;
-            _galaxyInitComplete  = false;
-            _pendingSteamHelper  = null;
-            _authListener        = null;
-            _stateChangeListener = null;
-            if (_steamInitialized)
+            ForceWrite();
+            if (_galaxyInitComplete && !_galaxySignedIn && !string.IsNullOrEmpty(_steamAuthUrl))
             {
-                try { GameServer.Shutdown(); } catch { }
-                _steamInitialized = false;
+                Monitor.Log("SaveLoaded — retrying Galaxy sign-in.", LogLevel.Info);
+                Task.Run(FetchAndSignIn);
             }
-            return false; // skip original
         }
 
-        // ── Harmony: SteamNetServer.initialize prefix — skip ─────
-        // Game's built-in SteamNetServer.initialize() calls SteamMatchmaking.CreateLobby()
-        // which requires Steam Client API (not available in GameServer mode).
-        private static bool SteamNetServer_Initialize_Prefix()
-        {
-            _instance?.Monitor.Log("SteamNetServer.initialize skipped (GameServer mode).", LogLevel.Debug);
-            return false; // skip original
-        }
-
-        // ── Harmony: SteamUser.GetSteamID prefix ─────────────────
-        // SteamAPI.Init() was never called (GameServer mode), so any direct call to
-        // SteamUser.GetSteamID() would crash. Return GameServer's Steam ID instead,
-        // or a stable fake ID while waiting for the GameServer connection.
-        private static bool SteamUser_GetSteamID_Prefix(ref CSteamID __result)
-        {
-            __result = (_steamInitialized && _serverSteamId.IsValid())
-                ? _serverSteamId
-                : new CSteamID(123456789UL);
-            return false; // skip original
-        }
-
-        // ── Harmony: SteamFriends.GetPersonaName prefix ──────────
-        // Same reason as above — Steam Client API unavailable in GameServer mode.
-        private static bool SteamFriends_GetPersonaName_Prefix(ref string __result)
-        {
-            __result = ServerName;
-            return false; // skip original
-        }
-
-        // ── Galaxy init (runs once Steam ID is confirmed) ─────────
+        // ── PerformGalaxyInit ───────────────────────────────────────
+        // Initialise the Galaxy SDK and attempt sign-in if steam-auth is available.
+        // Called from OnGameLaunched (direct) or SteamHelper_Initialize_Prefix (safety net).
         private void PerformGalaxyInit(SteamHelper steamHelper)
         {
             if (_galaxyInitComplete) return;
-            _pendingSteamHelper = null;
 
             try
             {
-                Monitor.Log("Initializing GOG Galaxy SDK for invite codes...", LogLevel.Info);
+                Monitor.Log("Initializing Galaxy SDK for invite codes...", LogLevel.Info);
                 GalaxyInstance.Init(new InitParams(GalaxyClientId, GalaxyClientSecret, "."));
 
-                _authListener        = CreateGalaxyAuthListener(steamHelper);
-                _stateChangeListener = CreateGalaxyStateChangeListener(steamHelper);
+                _authListener        = CreateAuthListener(steamHelper);
+                _stateChangeListener = CreateStateChangeListener(steamHelper);
+                _galaxyInitComplete  = true;
 
-                _galaxyInitComplete = true;
+                Monitor.Log("Galaxy SDK initialized. Attempting sign-in...", LogLevel.Info);
 
                 if (!string.IsNullOrEmpty(_steamAuthUrl))
                 {
-                    // Fetch app ticket from steam-auth and sign in to Galaxy (non-blocking)
-                    Task.Run(() => FetchTicketAndSignIn(steamHelper));
+                    Task.Run(FetchAndSignIn);
                 }
                 else
                 {
                     Monitor.Log("STEAM_AUTH_URL not set — invite codes need steam-auth logged in.", LogLevel.Warn);
-                    SetSteamNetworking(steamHelper, CreateSteamNetHelper());
-                    SetSteamConnectionFinished(steamHelper, true);
-                }
-            }
-            catch (Exception ex)
-            {
-                Monitor.Log($"Galaxy init failed (non-fatal): {ex.Message}", LogLevel.Warn);
-                SetSteamNetworking(steamHelper, CreateSteamNetHelper());
-                SetSteamConnectionFinished(steamHelper, true);
-            }
-        }
-
-        // steamHelper is null on the SaveLoaded retry path (connection state already finalised)
-        private async Task FetchTicketAndSignIn(SteamHelper? steamHelper)
-        {
-            try
-            {
-                Monitor.Log("Requesting Steam app ticket from steam-auth...", LogLevel.Info);
-                var response = await _http.GetAsync($"{_steamAuthUrl}/steam/app-ticket");
-
-                if (!response.IsSuccessStatusCode)
-                {
-                    var body = await response.Content.ReadAsStringAsync();
-                    Monitor.Log($"steam-auth returned {(int)response.StatusCode}: {body}", LogLevel.Warn);
-                    Monitor.Log("Log in via the Steam panel to enable invite codes.", LogLevel.Warn);
-                    if (steamHelper != null)
+                    if (steamHelper.Networking == null)
                     {
                         SetSteamNetworking(steamHelper, CreateSteamNetHelper());
                         SetSteamConnectionFinished(steamHelper, true);
                     }
+                }
+            }
+            catch (Exception ex)
+            {
+                Monitor.Log($"Galaxy SDK init failed (non-fatal): {ex.Message}", LogLevel.Warn);
+                if (steamHelper.Networking == null)
+                {
+                    SetSteamNetworking(steamHelper, CreateSteamNetHelper());
+                    SetSteamConnectionFinished(steamHelper, true);
+                }
+            }
+        }
+
+        // ── FetchAndSignIn ──────────────────────────────────────────
+        // Fetch encrypted app ticket from steam-auth and sign into Galaxy.
+        // Called at startup and retried every 30s until successful.
+        private async Task FetchAndSignIn()
+        {
+            try
+            {
+                Monitor.Log("Fetching Steam app ticket from steam-auth...", LogLevel.Info);
+                var resp = await _http.GetAsync($"{_steamAuthUrl}/steam/app-ticket");
+
+                if (!resp.IsSuccessStatusCode)
+                {
+                    var body = await resp.Content.ReadAsStringAsync();
+                    Monitor.Log($"steam-auth returned {(int)resp.StatusCode}: {body}", LogLevel.Warn);
+                    Monitor.Log("Log in via the Steam panel to enable invite codes.", LogLevel.Warn);
                     return;
                 }
 
-                var json   = await response.Content.ReadAsStringAsync();
+                var json   = await resp.Content.ReadAsStringAsync();
                 var doc    = JsonDocument.Parse(json);
                 var b64    = doc.RootElement.GetProperty("app_ticket").GetString() ?? "";
                 var ticket = Convert.FromBase64String(b64);
 
                 Monitor.Log($"App ticket received ({ticket.Length} bytes). Signing into Galaxy...", LogLevel.Info);
-                _galaxySignedIn = true;
                 GalaxyInstance.User().SignInSteam(ticket, (uint)ticket.Length, ServerName);
-                // Galaxy auth result arrives via _authListener / _stateChangeListener callbacks
+                _galaxySignedIn = true;
+                // Galaxy result arrives via _authListener / _stateChangeListener callbacks
             }
             catch (Exception ex)
             {
-                Monitor.Log($"App ticket fetch failed (non-fatal): {ex.Message}", LogLevel.Warn);
-                Monitor.Log("Log in via the Steam panel to enable invite codes.", LogLevel.Warn);
-                if (steamHelper != null)
-                {
-                    SetSteamNetworking(steamHelper, CreateSteamNetHelper());
-                    SetSteamConnectionFinished(steamHelper, true);
-                }
+                Monitor.Log($"App ticket fetch failed: {ex.Message}", LogLevel.Warn);
             }
         }
 
-        // ── Galaxy listeners ──────────────────────────────────────
-        private IAuthListener CreateGalaxyAuthListener(SteamHelper steamHelper)
+        // ── Harmony: SteamHelper.Initialize ────────────────────────
+        // Safety net: if this fires before OnGameLaunched (or after), init Galaxy here too.
+        private static bool SteamHelper_Initialize_Prefix(SteamHelper __instance)
         {
-            var listenerType = AccessTools.TypeByName("StardewValley.SDKs.GogGalaxy.Listeners.GalaxyAuthListener");
+            _instance?.Monitor.Log("SteamHelper.Initialize intercepted.", LogLevel.Debug);
+            SetSteamActive(__instance, true);
+            if (!_galaxyInitComplete)
+                _instance?.PerformGalaxyInit(__instance);
+            return false; // skip original
+        }
+
+        // ── Harmony: SteamHelper.Update ─────────────────────────────
+        private static bool SteamHelper_Update_Prefix(SteamHelper __instance)
+        {
+            if (_helper == null) return false;
+            bool active = _helper.Reflection.GetField<bool>(__instance, "active").GetValue();
+            if (active && _galaxyInitComplete)
+                try { GalaxyInstance.ProcessData(); } catch { }
+            Game1.game1.IsMouseVisible = Game1.paused || Game1.options.hardwareCursor;
+            return false; // skip original
+        }
+
+        // ── Harmony: SteamHelper.Shutdown ───────────────────────────
+        private static bool SteamHelper_Shutdown_Prefix()
+        {
+            _instance?.Monitor.Log("SteamHelper.Shutdown — resetting Galaxy state.", LogLevel.Debug);
+            _cachedInviteCode    = null;
+            _galaxySignedIn      = false;
+            _galaxyInitComplete  = false;
+            _authListener        = null;
+            _stateChangeListener = null;
+            return false; // skip original
+        }
+
+        // ── Harmony: SteamNetServer.initialize ──────────────────────
+        private static bool SteamNetServer_Initialize_Prefix()
+        {
+            _instance?.Monitor.Log("SteamNetServer.initialize skipped (incompatible with GameServer mode).", LogLevel.Debug);
+            return false; // skip original
+        }
+
+        // ── Harmony: SteamUser.GetSteamID ───────────────────────────
+        // SteamAPI.Init() was never called — return a stable fake ID to prevent crashes.
+        private static bool SteamUser_GetSteamID_Prefix(ref CSteamID __result)
+        {
+            __result = new CSteamID(123456789UL);
+            return false;
+        }
+
+        // ── Harmony: SteamFriends.GetPersonaName ────────────────────
+        private static bool SteamFriends_GetPersonaName_Prefix(ref string __result)
+        {
+            __result = ServerName;
+            return false;
+        }
+
+        // ── Galaxy auth listener ─────────────────────────────────────
+        private IAuthListener CreateAuthListener(SteamHelper steamHelper)
+        {
+            var t = AccessTools.TypeByName("StardewValley.SDKs.GogGalaxy.Listeners.GalaxyAuthListener");
 
             Action onSuccess = () =>
                 Monitor.Log("Galaxy auth success.", LogLevel.Info);
 
             Action<IAuthListener.FailureReason> onFailure = (reason) =>
             {
-                Monitor.Log($"Galaxy auth failure: {reason}", LogLevel.Warn);
+                Monitor.Log($"Galaxy auth failure: {reason} — will retry when logged in.", LogLevel.Warn);
+                _galaxySignedIn = false; // allow retry loop to re-attempt
                 if (steamHelper.Networking == null)
                     SetSteamNetworking(steamHelper, CreateSteamNetHelper());
                 SetSteamConnectionFinished(steamHelper, true);
@@ -429,84 +323,71 @@ namespace StardropDashboard
 
             Action onLost = () =>
             {
-                Monitor.Log("Galaxy auth lost.", LogLevel.Warn);
-                if (steamHelper.Networking == null)
-                    SetSteamNetworking(steamHelper, CreateSteamNetHelper());
-                SetSteamConnectionFinished(steamHelper, true);
+                Monitor.Log("Galaxy auth lost — will retry.", LogLevel.Warn);
+                _galaxySignedIn = false;
             };
 
-            return (IAuthListener)Activator.CreateInstance(listenerType, onSuccess, onFailure, onLost)!;
+            return (IAuthListener)Activator.CreateInstance(t, onSuccess, onFailure, onLost)!;
         }
 
-        private IOperationalStateChangeListener CreateGalaxyStateChangeListener(SteamHelper steamHelper)
+        // ── Galaxy state change listener ─────────────────────────────
+        // Mirrors JunimoServer's SteamHelper-mode state change listener exactly.
+        private IOperationalStateChangeListener CreateStateChangeListener(SteamHelper steamHelper)
         {
-            var listenerType = AccessTools.TypeByName("StardewValley.SDKs.GogGalaxy.Listeners.GalaxyOperationalStateChangeListener");
+            var t = AccessTools.TypeByName("StardewValley.SDKs.GogGalaxy.Listeners.GalaxyOperationalStateChangeListener");
 
-            Action<uint> onStateChange = (state) =>
+            Action<uint> onChange = (state) =>
             {
-                if ((state & 1) != 0)
-                    Monitor.Log("Galaxy signed in.", LogLevel.Debug);
+                Monitor.Log($"Galaxy state changed: {state}", LogLevel.Info);
 
                 if ((state & 2) != 0)
                 {
                     Monitor.Log("Galaxy logged on — invite codes active.", LogLevel.Info);
-                    // Networking may already be set from the initial fallback (ticket fetch failed
-                    // at launch). Don't overwrite it, but always mark Galaxy as connected —
-                    // SetSteamGalaxyConnected(true) switches sdk.Networking to GalaxyNetHelper,
-                    // which TryLateAddGalaxyServer then uses to create the GalaxyNetServer.
+                    // Order matters (per JunimoServer): set networking → ConnectionFinished → GalaxyConnected → late-add
                     if (steamHelper.Networking == null)
-                    {
                         SetSteamNetworking(steamHelper, CreateSteamNetHelper());
-                        SetSteamConnectionFinished(steamHelper, true);
-                    }
+                    SetSteamConnectionFinished(steamHelper, true);
                     SetSteamGalaxyConnected(steamHelper, true);
                     TryLateAddGalaxyServer();
                 }
             };
 
-            return (IOperationalStateChangeListener)Activator.CreateInstance(listenerType, onStateChange)!;
+            return (IOperationalStateChangeListener)Activator.CreateInstance(t, onChange)!;
         }
 
-        // ── Late-add Galaxy server (race condition recovery) ──────
-        // Called when Galaxy logs on after the game server is already running.
-        // Adds a GalaxyNetServer to Game1.server's internal servers list so the
-        // Galaxy lobby is created and an invite code becomes available.
-        // Must be called AFTER SetSteamGalaxyConnected(true) — that call switches
-        // sdk.Networking to GalaxyNetHelper so CreateServer() produces the right type.
+        // ── TryLateAddGalaxyServer ────────────────────────────────────
+        // Adds a GalaxyNetServer to the running game server when Galaxy logs on after
+        // the server was already created (the normal race condition on a dedicated server).
+        // Must be called AFTER SetSteamGalaxyConnected(true) — that switches sdk.Networking
+        // to GalaxyNetHelper so CreateServer() produces the correct type.
         private static void TryLateAddGalaxyServer()
         {
             try
             {
                 if (Game1.server == null)
                 {
-                    _instance?.Monitor.Log("TryLateAddGalaxyServer: Game1.server is null, skipping.", LogLevel.Debug);
+                    _instance?.Monitor.Log("TryLateAddGalaxyServer: no server running yet.", LogLevel.Debug);
                     return;
                 }
 
-                var sdkGetter = AccessTools.PropertyGetter(
-                    AccessTools.TypeByName("StardewValley.Program"), "sdk");
-                var sdk = sdkGetter?.Invoke(null, null) as SDKHelper;
+                var sdk = GetCurrentSdk();
                 if (sdk?.Networking == null)
                 {
-                    _instance?.Monitor.Log("TryLateAddGalaxyServer: sdk.Networking is null, skipping.", LogLevel.Debug);
+                    _instance?.Monitor.Log("TryLateAddGalaxyServer: sdk.Networking is null.", LogLevel.Debug);
                     return;
                 }
 
                 var serversField = _helper!.Reflection.GetField<List<Server>>(Game1.server, "servers");
-                var servers = serversField.GetValue();
+                var servers      = serversField.GetValue();
 
-                // Don't add a second GalaxyNetServer if one already exists
-                bool alreadyHasGalaxy = false;
                 foreach (var s in servers)
-                    if (s.GetType().Name == "GalaxyNetServer") { alreadyHasGalaxy = true; break; }
+                    if (s.GetType().Name == "GalaxyNetServer")
+                    {
+                        _instance?.Monitor.Log("GalaxyNetServer already present.", LogLevel.Debug);
+                        return;
+                    }
 
-                if (alreadyHasGalaxy)
-                {
-                    _instance?.Monitor.Log("TryLateAddGalaxyServer: GalaxyNetServer already present.", LogLevel.Debug);
-                    return;
-                }
-
-                _instance?.Monitor.Log("Late-adding GalaxyNetServer (Galaxy logged on after server created)...", LogLevel.Info);
+                _instance?.Monitor.Log("Late-adding GalaxyNetServer...", LogLevel.Info);
                 var galaxyServer = sdk.Networking.CreateServer(Game1.server);
                 if (galaxyServer != null)
                 {
@@ -521,11 +402,26 @@ namespace StardropDashboard
             }
             catch (Exception ex)
             {
-                _instance?.Monitor.Log($"TryLateAddGalaxyServer failed (non-fatal): {ex.Message}", LogLevel.Warn);
+                _instance?.Monitor.Log($"TryLateAddGalaxyServer failed: {ex.Message}", LogLevel.Warn);
             }
         }
 
-        // ── SteamHelper reflection helpers ────────────────────────
+        // ── Harmony: GalaxySocket.GetInviteCode postfix ──────────────
+        private static void GalaxySocket_GetInviteCode_Postfix(string __result)
+        {
+            if (string.IsNullOrEmpty(__result) || __result == _cachedInviteCode) return;
+            _cachedInviteCode = __result;
+            _instance?.Monitor.Log($"[InviteCode] Captured: {__result}", LogLevel.Info);
+            _instance?.ForceWrite();
+        }
+
+        // ── SteamHelper reflection helpers ────────────────────────────
+        private static SDKHelper? GetCurrentSdk()
+        {
+            var getter = AccessTools.PropertyGetter(AccessTools.TypeByName("StardewValley.Program"), "sdk");
+            return getter?.Invoke(null, null) as SDKHelper;
+        }
+
         private static void SetSteamActive(SteamHelper h, bool v) =>
             _helper!.Reflection.GetField<bool>(h, "active").SetValue(v);
         private static void SetSteamConnectionFinished(SteamHelper h, bool v) =>
@@ -537,22 +433,11 @@ namespace StardropDashboard
 
         private static SDKNetHelper CreateSteamNetHelper()
         {
-            var type = AccessTools.TypeByName("StardewValley.SDKs.Steam.SteamNetHelper");
-            return (SDKNetHelper)Activator.CreateInstance(type)!;
+            var t = AccessTools.TypeByName("StardewValley.SDKs.Steam.SteamNetHelper");
+            return (SDKNetHelper)Activator.CreateInstance(t)!;
         }
 
-        // ── Harmony postfix — fires when Galaxy generates invite code ──
-        private static void GalaxySocket_GetInviteCode_Postfix(string __result)
-        {
-            if (string.IsNullOrEmpty(__result)) return;
-            if (__result == _cachedInviteCode) return;
-
-            _cachedInviteCode = __result;
-            _instance?.Monitor.Log($"[InviteCode] Captured: {__result}", LogLevel.Debug);
-            _instance?.ForceWrite();
-        }
-
-        // ── Resolve output directory ──────────────────────────────
+        // ── Resolve output directory ──────────────────────────────────
         private string ResolveOutputPath()
         {
             if (!string.IsNullOrWhiteSpace(Config.OutputDirectory))
@@ -563,47 +448,44 @@ namespace StardropDashboard
 
         private string LiveStatusFile => Path.Combine(_outputPath, "live-status.json");
 
-        // ── Tick update ───────────────────────────────────────────
+        // ── OnUpdateTicked ────────────────────────────────────────────
         private void OnUpdateTicked(object? sender, UpdateTickedEventArgs e)
         {
             if (!Context.IsWorldReady) return;
 
-            // Keep multiplayer network settings tuned for low latency.
-            // These revert to defaults if not re-applied each tick.
-            Game1.Multiplayer.defaultInterpolationTicks      = 7;  // default: 15
-            Game1.Multiplayer.farmerDeltaBroadcastPeriod     = 1;  // default: 3
-            Game1.Multiplayer.locationDeltaBroadcastPeriod   = 1;  // default: 3
-            Game1.Multiplayer.worldStateDeltaBroadcastPeriod = 1;  // default: 3
+            // Network tuning — re-applied each tick as the game reverts these to defaults
+            Game1.Multiplayer.defaultInterpolationTicks      = 7;
+            Game1.Multiplayer.farmerDeltaBroadcastPeriod     = 1;
+            Game1.Multiplayer.locationDeltaBroadcastPeriod   = 1;
+            Game1.Multiplayer.worldStateDeltaBroadcastPeriod = 1;
 
             double elapsed = Game1.currentGameTime.ElapsedGameTime.TotalSeconds;
             _secondsSinceLastWrite += elapsed;
-
             if (_secondsSinceLastWrite >= Config.UpdateIntervalSeconds)
             {
                 _secondsSinceLastWrite = 0;
                 WriteStatus();
             }
 
-            // Retry Galaxy sign-in every 30s while running but not yet signed in.
-            // Covers the case where the user opens the panel and logs into steam-auth
-            // after the save has already loaded (the SaveLoaded one-shot is already gone).
+            // Retry Galaxy sign-in every 30s.
+            // Covers the case where the user logs into steam-auth after the server started.
             if (_galaxyInitComplete && !_galaxySignedIn && !string.IsNullOrEmpty(_steamAuthUrl))
             {
-                _secondsSinceLastGalaxyRetry += elapsed;
-                if (_secondsSinceLastGalaxyRetry >= 30)
+                _secondsSinceRetry += elapsed;
+                if (_secondsSinceRetry >= 30)
                 {
-                    _secondsSinceLastGalaxyRetry = 0;
-                    Task.Run(() => FetchTicketAndSignIn(null));
+                    _secondsSinceRetry = 0;
+                    Task.Run(FetchAndSignIn);
                 }
             }
         }
 
-        // ── Write offline tombstone ───────────────────────────────
+        // ── Write helpers ─────────────────────────────────────────────
         private void WriteOffline()
         {
-            _cachedInviteCode            = null;
-            _galaxySignedIn              = false;
-            _secondsSinceLastGalaxyRetry = 0;
+            _cachedInviteCode  = null;
+            _galaxySignedIn    = false;
+            _secondsSinceRetry = 0;
             WriteToDisk(new LiveStatus
             {
                 Timestamp   = DateTimeOffset.UtcNow.ToUnixTimeSeconds(),
@@ -613,17 +495,13 @@ namespace StardropDashboard
 
         private void ForceWrite()
         {
-            if (Context.IsWorldReady) WriteStatus();
-            else WriteOffline();
+            if (Context.IsWorldReady) WriteStatus(); else WriteOffline();
         }
 
         private void WriteStatus()
         {
             try { WriteToDisk(CollectStatus()); }
-            catch (Exception ex)
-            {
-                Monitor.Log($"Failed to write live-status.json: {ex.Message}", LogLevel.Warn);
-            }
+            catch (Exception ex) { Monitor.Log($"Failed to write live-status.json: {ex.Message}", LogLevel.Warn); }
         }
 
         private LiveStatus CollectStatus()
@@ -659,10 +537,7 @@ namespace StardropDashboard
                         },
                     });
                 }
-                catch (Exception ex)
-                {
-                    Monitor.Log($"Error reading player {farmer?.Name}: {ex.Message}", LogLevel.Trace);
-                }
+                catch (Exception ex) { Monitor.Log($"Error reading player {farmer?.Name}: {ex.Message}", LogLevel.Trace); }
             }
 
             // -- Cabins --
@@ -671,7 +546,7 @@ namespace StardropDashboard
             {
                 if (building.indoors.Value is StardewValley.Locations.Cabin cabin)
                 {
-                    var owner = cabin.owner;
+                    var owner    = cabin.owner;
                     bool isOnline = false;
                     if (owner != null)
                         foreach (var f in Game1.getOnlineFarmers())
@@ -690,9 +565,9 @@ namespace StardropDashboard
             }
 
             // -- Weather --
-            string weather = Game1.isRaining    ? "rain"
-                           : Game1.isSnowing    ? "snow"
-                           : Game1.isLightning  ? "storm"
+            string weather = Game1.isRaining       ? "rain"
+                           : Game1.isSnowing       ? "snow"
+                           : Game1.isLightning     ? "storm"
                            : Game1.isDebrisWeather ? "wind"
                            : "sunny";
 
@@ -702,7 +577,7 @@ namespace StardropDashboard
                 ? Game1.CurrentEvent.FestivalName ?? ""
                 : "";
 
-            // -- Time formatting --
+            // -- Time --
             int timeInt = Game1.timeOfDay;
             int hours   = timeInt / 100;
             int minutes = timeInt % 100;
@@ -710,7 +585,7 @@ namespace StardropDashboard
             int hours12 = hours > 12 ? hours - 12 : hours == 0 ? 12 : hours;
             string timeStr = $"{hours12}:{minutes:D2} {(isPm ? "PM" : "AM")}";
 
-            // -- Invite code (from Harmony hook; fall back to polling) --
+            // -- Invite code (Harmony postfix is primary; poll as fallback) --
             string? inviteCode = _cachedInviteCode;
             if (string.IsNullOrEmpty(inviteCode))
             {
@@ -739,7 +614,7 @@ namespace StardropDashboard
             };
         }
 
-        // ── Write to disk (atomic via temp file) ──────────────────
+        // ── Write to disk (atomic via temp file) ─────────────────────
         private void WriteToDisk(LiveStatus status)
         {
             string json    = JsonSerializer.Serialize(status, _jsonOpts);
