@@ -1240,8 +1240,6 @@ function init() {
   setupNavigation();
   setupWebSocket();
   loadDashboard();
-  loadSteam();
-  checkSteamAuthRequired();
   loadBackupStatus();
   renderQuickActions();
 
@@ -1317,13 +1315,13 @@ function navigateTo(page) {
   document.getElementById('sidebar').classList.remove('open');
 
   switch (page) {
-    case 'dashboard': loadDashboard(); loadSteam(); renderQuickActions();    break;
+    case 'dashboard': loadDashboard(); renderQuickActions();                  break;
     case 'farm':      loadFarm();                                            break;
     case 'players':   loadPlayers();                                         break;
     case 'saves':     loadSaves();                                           break;
     case 'mods':      loadMods();                                            break;
     case 'logs':      loadLogs('all'); subscribeToLogs('all');               break;
-    case 'config':    loadConfig(); loadVnc(); loadServerModeCard(); loadSteam(); break;
+    case 'config':    loadConfig(); loadVnc(); loadServerModeCard();             break;
   }
 }
 
@@ -1595,290 +1593,6 @@ function updateDashboardUI(data) {
   setText('detail-local-ips', net.localIps?.[0] || '--');
   setText('detail-vnc',       data.vncEnabled ? `Enabled — port ${net.vncPort || 5900}` : 'Disabled');
 
-}
-
-// ─── Steam / Invite Code ──────────────────────────────────────────
-let _steamPollInterval = null;
-
-async function loadSteam() {
-  const [authData, codeData] = await Promise.all([
-    API.get('/api/steam/status').catch(() => null),
-    API.get('/api/steam/invitecode').catch(() => null),
-  ]);
-  renderSteamPanel(authData, codeData?.inviteCode || null, codeData?.serverMode || 'lan');
-}
-
-function renderSteamPanel(auth, inviteCode, serverMode) {
-  const panel   = document.getElementById('steamPanel');
-  const card    = document.getElementById('steamCard');
-  const titleEl = document.getElementById('steamCardTitle');
-  if (!panel) return;
-  if (card) card.style.display = '';
-
-  const isLan   = !serverMode || serverMode === 'lan';
-  const state   = auth?.state || 'unavailable';
-  const loggedIn = state === 'online';
-
-  if (isLan) {
-    stopSteamPolling();
-    if (titleEl) titleEl.textContent = 'Server Mode';
-    panel.innerHTML = `<div style="color:var(--text-secondary);font-size:13px">LAN — Use 'Join IP' in co-op game on a local network or VPN.</div>`;
-    return;
-  }
-
-  if (titleEl) titleEl.textContent = 'Invite Code';
-
-  // ── Logged in — show invite code or waiting ────────────────────
-  if (loggedIn) {
-    stopSteamPolling();
-    if (inviteCode) {
-      panel.innerHTML = `
-        <div class="detail-label" style="margin-bottom:4px">Share this code with friends</div>
-        <div class="detail-value" style="font-family:monospace;letter-spacing:1px;font-size:15px;margin:4px 0">${escapeHtml(inviteCode)}</div>
-        <div class="detail-note">Stardew Valley → Co-op → Enter Invite Code</div>
-        <button class="btn btn-sm btn-secondary" style="margin-top:8px" onclick="steamLogout()">Log out of Steam</button>`;
-    } else {
-      panel.innerHTML = `
-        <div style="color:var(--text-muted);font-size:13px">Logged in — waiting for multiplayer session...</div>
-        <button class="btn btn-sm btn-secondary" style="margin-top:8px" onclick="steamLogout()">Log out of Steam</button>`;
-    }
-    return;
-  }
-
-  // ── Logging in — spinner ──────────────────────────────────────
-  if (state === 'logging_in') {
-    startSteamPolling();
-    panel.innerHTML = `<div style="color:var(--text-secondary);font-size:13px">Logging in to Steam…</div>`;
-    return;
-  }
-
-  // ── Steam Guard required ──────────────────────────────────────
-  if (state === 'guard_required') {
-    startSteamPolling();
-    const errMsg = auth?.lastError ? `<div style="color:var(--danger);font-size:12px;margin-bottom:6px">${escapeHtml(auth.lastError)}</div>` : '';
-    panel.innerHTML = `
-      ${errMsg}
-      <div style="font-size:13px;margin-bottom:8px">Steam Guard code required</div>
-      <div style="display:flex;gap:8px;align-items:center">
-        <input id="steamGuardInput" type="text" maxlength="10" placeholder="Code"
-               style="width:120px;padding:6px 10px;border-radius:6px;border:1px solid var(--border);background:var(--bg-primary);color:var(--text-primary);font-size:14px"
-               onkeydown="if(event.key==='Enter')submitSteamGuard()">
-        <button class="btn btn-sm btn-primary" onclick="submitSteamGuard()">Submit</button>
-        <button class="btn btn-sm btn-secondary" onclick="steamCancelLogin()">Cancel</button>
-      </div>`;
-    setTimeout(() => document.getElementById('steamGuardInput')?.focus(), 50);
-    return;
-  }
-
-  // ── Unavailable ───────────────────────────────────────────────
-  if (state === 'unavailable') {
-    stopSteamPolling();
-    panel.innerHTML = `<div style="color:var(--text-muted);font-size:13px">Steam auth service not running — invite codes unavailable.</div>`;
-    return;
-  }
-
-  // ── Offline / error — show login form ────────────────────────
-  stopSteamPolling();
-  const errMsg = auth?.lastError ? `<div style="color:var(--danger);font-size:12px;margin-bottom:8px">${escapeHtml(auth.lastError)}</div>` : '';
-  panel.innerHTML = `
-    ${errMsg}
-    <div style="font-size:13px;margin-bottom:8px;color:var(--text-secondary)">Log in to Steam to enable invite codes</div>
-    <div style="display:grid;gap:6px">
-      <input id="steamUsernameInput" type="text" placeholder="Steam username" autocomplete="username"
-             style="padding:6px 10px;border-radius:6px;border:1px solid var(--border);background:var(--bg-primary);color:var(--text-primary);font-size:13px">
-      <input id="steamPasswordInput" type="password" placeholder="Password" autocomplete="current-password"
-             style="padding:6px 10px;border-radius:6px;border:1px solid var(--border);background:var(--bg-primary);color:var(--text-primary);font-size:13px"
-             onkeydown="if(event.key==='Enter')steamLogin()">
-      <button class="btn btn-sm btn-primary" onclick="steamLogin()">Log in</button>
-    </div>`;
-}
-
-async function steamLogin() {
-  const username = document.getElementById('steamUsernameInput')?.value?.trim();
-  const password = document.getElementById('steamPasswordInput')?.value;
-  if (!username || !password) return;
-
-  const panel = document.getElementById('steamPanel');
-  if (panel) panel.innerHTML = `<div style="color:var(--text-secondary);font-size:13px">Logging in…</div>`;
-
-  await API.post('/api/steam/login', { username, password }).catch(() => null);
-  startSteamPolling();
-}
-
-async function submitSteamGuard() {
-  const code = document.getElementById('steamGuardInput')?.value?.trim();
-  if (!code) return;
-  await API.post('/api/steam/guard', { code }).catch(() => null);
-  loadSteam();
-}
-
-async function steamCancelLogin() {
-  await API.post('/api/steam/logout').catch(() => null);
-  stopSteamPolling();
-  loadSteam();
-}
-
-async function steamLogout() {
-  await API.post('/api/steam/logout').catch(() => null);
-  loadSteam();
-}
-
-function startSteamPolling() {
-  if (_steamPollInterval) return;
-  _steamPollInterval = setInterval(loadSteam, 3000);
-}
-
-function stopSteamPolling() {
-  if (!_steamPollInterval) return;
-  clearInterval(_steamPollInterval);
-  _steamPollInterval = null;
-}
-
-// ─── Steam Auth Modal ─────────────────────────────────────────────
-// Blocking overlay shown on page load when serverMode=online and steam-auth
-// is not yet logged in. Session is memory-only so it reappears after any
-// container restart. User can skip to proceed without an invite code.
-
-let _steamModalPollInterval = null;
-let _steamModalLastState   = null;
-
-async function checkSteamAuthRequired() {
-  const [authData, codeData] = await Promise.all([
-    API.get('/api/steam/status').catch(() => null),
-    API.get('/api/steam/invitecode').catch(() => null),
-  ]);
-  const serverMode = codeData?.serverMode || 'lan';
-  const state      = authData?.state || 'unavailable';
-  if (serverMode !== 'lan' && state !== 'online') {
-    _showSteamModal(authData);
-  }
-}
-
-function _showSteamModal(auth) {
-  const modal = document.getElementById('steamAuthModal');
-  if (!modal) return;
-  modal.style.display = 'flex';
-  _renderSteamModal(auth);
-}
-
-function dismissSteamModal() {
-  const modal = document.getElementById('steamAuthModal');
-  if (modal) modal.style.display = 'none';
-  _stopSteamModalPolling();
-  _steamModalLastState = null;
-  loadSteam();  // refresh the inline card in dashboard / config
-}
-
-function _renderSteamModal(auth) {
-  const body = document.getElementById('steamAuthModalBody');
-  if (!body) return;
-
-  const state   = auth?.state || 'unavailable';
-  const skipBtn = `<button class="btn btn-secondary" onclick="dismissSteamModal()" style="width:100%;margin-top:8px">Skip — use LAN</button>`;
-
-  if (state === 'online') {
-    dismissSteamModal();
-    return;
-  }
-
-  if (state === 'logging_in') {
-    _startSteamModalPolling();
-    body.innerHTML = `
-      <div style="color:var(--text-secondary);font-size:13px;margin-bottom:4px">Logging in to Steam…</div>
-      ${skipBtn}`;
-    return;
-  }
-
-  if (state === 'guard_required') {
-    _startSteamModalPolling();
-    const errMsg = auth?.lastError
-      ? `<div style="color:var(--danger);font-size:12px;margin-bottom:6px">${escapeHtml(auth.lastError)}</div>`
-      : '';
-    body.innerHTML = `
-      ${errMsg}
-      <div style="font-size:13px;margin-bottom:8px">Enter your Steam Guard code</div>
-      <div style="display:flex;gap:8px;align-items:center;margin-bottom:4px">
-        <input id="steamModalGuardInput" type="text" maxlength="10" placeholder="Code"
-               style="flex:1;padding:7px 10px;border-radius:6px;border:1px solid var(--border);background:var(--bg-primary);color:var(--text-primary);font-size:14px;letter-spacing:2px"
-               onkeydown="if(event.key==='Enter')_submitSteamModalGuard()">
-        <button class="btn btn-sm btn-primary" onclick="_submitSteamModalGuard()">Submit</button>
-        <button class="btn btn-sm btn-secondary" onclick="_cancelSteamModalLogin()">Cancel</button>
-      </div>
-      ${skipBtn}`;
-    setTimeout(() => document.getElementById('steamModalGuardInput')?.focus(), 50);
-    return;
-  }
-
-  if (state === 'unavailable') {
-    _stopSteamModalPolling();
-    body.innerHTML = `
-      <div style="color:var(--text-muted);font-size:13px;margin-bottom:4px">Steam auth service is not running — invite codes unavailable.</div>
-      ${skipBtn}`;
-    return;
-  }
-
-  // offline / error — login form
-  _stopSteamModalPolling();
-  const errMsg = auth?.lastError
-    ? `<div style="color:var(--danger);font-size:12px;margin-bottom:8px">${escapeHtml(auth.lastError)}</div>`
-    : '';
-  body.innerHTML = `
-    ${errMsg}
-    <div style="display:grid;gap:8px">
-      <input id="steamModalUsernameInput" type="text" placeholder="Steam username" autocomplete="username"
-             style="padding:7px 10px;border-radius:6px;border:1px solid var(--border);background:var(--bg-primary);color:var(--text-primary);font-size:13px">
-      <input id="steamModalPasswordInput" type="password" placeholder="Password" autocomplete="current-password"
-             style="padding:7px 10px;border-radius:6px;border:1px solid var(--border);background:var(--bg-primary);color:var(--text-primary);font-size:13px"
-             onkeydown="if(event.key==='Enter')_steamModalLogin()">
-      <button class="btn btn-primary" onclick="_steamModalLogin()" style="width:100%">Log in to Steam</button>
-      <button class="btn btn-secondary" onclick="dismissSteamModal()" style="width:100%;margin-top:2px">Skip — use LAN</button>
-    </div>`;
-  setTimeout(() => document.getElementById('steamModalUsernameInput')?.focus(), 50);
-}
-
-async function _steamModalLogin() {
-  const username = document.getElementById('steamModalUsernameInput')?.value?.trim();
-  const password = document.getElementById('steamModalPasswordInput')?.value;
-  if (!username || !password) return;
-
-  const body = document.getElementById('steamAuthModalBody');
-  if (body) body.innerHTML = `<div style="color:var(--text-secondary);font-size:13px">Logging in…</div>`;
-
-  await API.post('/api/steam/login', { username, password }).catch(() => null);
-  _startSteamModalPolling();
-}
-
-async function _submitSteamModalGuard() {
-  const code = document.getElementById('steamModalGuardInput')?.value?.trim();
-  if (!code) return;
-  await API.post('/api/steam/guard', { code }).catch(() => null);
-  _pollSteamModal();
-}
-
-async function _cancelSteamModalLogin() {
-  await API.post('/api/steam/logout').catch(() => null);
-  _stopSteamModalPolling();
-  _pollSteamModal();
-}
-
-async function _pollSteamModal() {
-  const authData = await API.get('/api/steam/status').catch(() => null);
-  const newState = authData?.state || 'unavailable';
-  // Don't re-render while user is typing — only update when state actually changes
-  if (newState === _steamModalLastState) return;
-  _steamModalLastState = newState;
-  _renderSteamModal(authData);
-}
-
-function _startSteamModalPolling() {
-  if (_steamModalPollInterval) return;
-  _steamModalPollInterval = setInterval(_pollSteamModal, 3000);
-}
-
-function _stopSteamModalPolling() {
-  if (!_steamModalPollInterval) return;
-  clearInterval(_steamModalPollInterval);
-  _steamModalPollInterval = null;
 }
 
 // ─── Farm ────────────────────────────────────────────────────────
@@ -2310,45 +2024,16 @@ function stopBackupStatusPolling() {
   if (backupStatusPoll) { clearInterval(backupStatusPoll); backupStatusPoll = null; }
 }
 
-// ─── Server Mode Toggle ──────────────────────────────────────────
+// ─── Server Mode Card ────────────────────────────────────────────
 async function loadServerModeCard() {
   const card = document.getElementById('serverModeCard');
   if (!card) return;
-  const data = await API.get('/api/config').catch(() => null);
-  const isSteam = data?.serverMode === 'steam';
   card.innerHTML = `
-    <div style="display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap">
-      <div>
-        <div style="font-weight:600;font-size:15px;margin-bottom:4px">Server Mode</div>
-        <div style="font-size:13px;color:var(--text-secondary)">
-          ${isSteam
-            ? 'Online — anonymous Steam / GOG lobbies. Invite codes generated automatically when multiplayer starts.'
-            : 'LAN — Use \'Join IP\' in co-op game on a Local Network or VPN Tunnel.'}
-        </div>
-      </div>
-      <div style="display:flex;align-items:center;gap:10px;flex-shrink:0">
-        <span style="font-size:13px;font-weight:700;color:${isSteam ? 'var(--accent)' : 'var(--text-secondary)'}">
-          ● ${isSteam ? 'Online' : 'LAN'}
-        </span>
-        <button class="btn btn-sm btn-secondary" onclick="switchServerMode('${isSteam ? 'lan' : 'steam'}')">
-          Switch to ${isSteam ? 'LAN' : 'Online'}
-        </button>
-      </div>
+    <div>
+      <div style="font-weight:600;font-size:15px;margin-bottom:4px">Server Mode</div>
+      <div style="font-size:13px;color:var(--text-secondary)">LAN — players join via the server IP on a local network or VPN tunnel (e.g. Tailscale, ZeroTier).</div>
     </div>
-    <p style="font-size:12px;color:var(--text-muted);margin:10px 0 0">Changes take effect after a container restart.</p>
   `;
-}
-
-async function switchServerMode(newMode) {
-  const label = newMode === 'steam' ? 'Online' : 'LAN';
-  if (!confirm(`Switch to ${label} mode? The container will need to restart.`)) return;
-  const data = await API.put('/api/config', { SERVER_MODE: newMode });
-  if (data?.success) {
-    await loadServerModeCard();
-    showRestartModal(`Switched to ${label} mode. Restart the container to apply.`);
-  } else {
-    showToast(data?.error || 'Failed to update mode', 'error');
-  }
 }
 
 // ─── Config ──────────────────────────────────────────────────────
@@ -2732,7 +2417,6 @@ async function _pollServerState(targetRunning, timeoutMs) {
     if (reached) {
       if (targetRunning && !isGameRestarting) {
         showToast('Server is online', 'success');
-        checkSteamAuthRequired();  // re-prompt if online mode (skip if restart — stay logged in)
       }
       return;
     }

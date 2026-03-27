@@ -401,12 +401,6 @@
             <div id="dashboardBackupStatus" class="backup-status" style="display:none"></div>
           </div>
 
-          <div class="card" id="steamCard">
-            <h3 id="steamCardTitle">Server Mode</h3>
-            <div id="steamPanel">
-              <div class="empty-state">Loading...</div>
-            </div>
-          </div>
         </section>
 
         <!-- ── Farm Overview ──────────────────────────────────── -->
@@ -742,12 +736,10 @@
         <div style="display:grid;gap:14px">
           <div>
             <label style="font-size:13px;color:var(--text-secondary);display:block;margin-bottom:6px">Connection Mode</label>
-            <p style="font-size:12px;color:var(--text-muted);margin:0 0 6px">LAN works on your local network or over a VPN (e.g. Tailscale, ZeroTier). Online uses anonymous Steam / GOG lobbies so friends can join via invite code — no port forwarding needed.</p>
+            <p style="font-size:12px;color:var(--text-muted);margin:0 0 6px">LAN works on your local network or over a VPN (e.g. Tailscale, ZeroTier, Hamachi).</p>
             <select id="wiz-server-mode" class="input" style="width:100%">
               <option value="lan">LAN — local network or VPN tunneling</option>
-              <option value="steam">Online — anonymous Steam / GOG lobbies</option>
             </select>
-            <p style="font-size:12px;color:var(--text-muted);margin:6px 0 0">💡 Running multiple servers on the same machine? Use Online mode — each server gets its own invite code. For multiple LAN servers, each needs its own machine or VM.</p>
           </div>
           <div>
             <label style="font-size:13px;color:var(--text-secondary);display:block;margin-bottom:6px">Server Password <span style="color:var(--text-muted)">(leave blank for open server)</span></label>
@@ -1125,20 +1117,7 @@
   <!-- ── Toast ──────────────────────────────────────────────────── -->
   <div id="toast" class="toast"></div>
 
-  <!-- ── Steam Auth Modal ─────────────────────────────────────── -->
-  <!-- Shown on page load when serverMode=online and not yet logged in to steam-auth. -->
-  <!-- Memory-only session — reappears after container restart / update.sh.          -->
-  <div id="steamAuthModal" class="modal-overlay" style="display:none">
-    <div class="modal-dialog steam-auth-dialog">
-      <div style="margin-bottom:18px">
-        <div style="font-size:17px;font-weight:600;margin-bottom:5px">Steam Login</div>
-        <div style="font-size:13px;color:var(--text-secondary)">Online mode — log in to get an invite code for friends to join.</div>
-      </div>
-      <div id="steamAuthModalBody"></div>
-    </div>
-  </div>
-
-  <script src="/js/api.js"></script>
+<script src="/js/api.js"></script>
   <script src="/js/app.js"></script>
 </body>
 </html>

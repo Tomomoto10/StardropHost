@@ -14,17 +14,5 @@
     <PackageReference Include="Pathoschild.Stardew.ModBuildConfig" Version="4.*" />
   </ItemGroup>
 
-  <ItemGroup>
-    <!-- Steamworks.NET — GameServer SDK for Steam relay -->
-    <Reference Include="Steamworks.NET">
-      <HintPath>$(GamePath)/Steamworks.NET.dll</HintPath>
-      <Private>false</Private>
-    </Reference>
-    <!-- GOG Galaxy SDK — ships with the game -->
-    <Reference Include="GalaxyCSharpGlue">
-      <HintPath>$(GamePath)/GalaxyCSharpGlue.dll</HintPath>
-      <Private>false</Private>
-    </Reference>
-  </ItemGroup>
 
 </Project>

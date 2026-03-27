@@ -3,14 +3,9 @@
  * Proxy to the steam-auth container for wizard game download (login/guard/logout).
  * The web panel never handles Steam credentials directly — it passes them
  * straight through to the isolated steam-auth service.
- *
- * Invite code is read directly from the StardropDashboard SMAPI mod output —
- * no Steam login is required for that.
  */
 
 const http   = require('http');
-const fs     = require('fs');
-const config = require('../server');
 
 const STEAM_AUTH_URL = process.env.STEAM_AUTH_URL || 'http://stardrop-steam-auth:18700';
 
@@ -59,11 +54,10 @@ async function getStatus(req, res) {
   } catch (e) {
     // steam-auth container not running — that's fine, it's optional
     res.json({
-      state:     'unavailable',
-      loggedIn:  false,
-      hasToken:  false,
-      inviteCode: null,
-      message:   'Steam auth service is not running',
+      state:   'unavailable',
+      loggedIn: false,
+      hasToken: false,
+      message:  'Steam auth service is not running',
     });
   }
 }
@@ -108,19 +102,4 @@ async function logout(req, res) {
   }
 }
 
-async function getInviteCode(req, res) {
-  // Invite code is written by the StardropDashboard SMAPI mod to live-status.json
-  const serverMode = (process.env.SERVER_MODE || 'lan').toLowerCase();
-
-  try {
-    const liveFile = process.env.LIVE_FILE || '/home/steam/.local/share/stardrop/live-status.json';
-    if (fs.existsSync(liveFile)) {
-      const live = JSON.parse(fs.readFileSync(liveFile, 'utf-8'));
-      if (live.inviteCode) return res.json({ inviteCode: live.inviteCode, serverMode });
-    }
-  } catch {}
-
-  res.json({ inviteCode: null, serverMode });
-}
-
-module.exports = { getStatus, login, submitGuardCode, logout, getInviteCode };
+module.exports = { getStatus, login, submitGuardCode, logout };

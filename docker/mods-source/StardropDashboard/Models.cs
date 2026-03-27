@@ -6,7 +6,6 @@ namespace StardropDashboard
     {
         public long   Timestamp          { get; set; }
         public string ServerState        { get; set; } = "offline";
-        public string? InviteCode        { get; set; } = null;
         public string FarmName           { get; set; } = "";
         public string Season             { get; set; } = "";
         public int    Day                { get; set; }
