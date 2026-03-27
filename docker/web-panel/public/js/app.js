@@ -2108,8 +2108,8 @@ async function loadVnc() {
     <div class="details-grid" style="margin-bottom:12px">
       <div class="detail-item">
         <div class="detail-label">Connection Status</div>
-        <div class="detail-value" style="color:${vnc?.running ? 'var(--accent)' : 'var(--text-muted)'}">
-          ${vnc?.running ? '● Running' : '○ Stopped'}
+        <div class="detail-value" style="color:${vnc?.enabled ? 'var(--accent)' : 'var(--text-muted)'}">
+          ${vnc?.enabled ? '● Running' : '○ Stopped'}
         </div>
       </div>
       <div class="detail-item">
