@@ -246,6 +246,8 @@ function collectStatus(req = null) {
   } else {
     // pgrep found nothing — SMAPI not running; override stale status/live file data
     status.gameRunning = false;
+    status.cpu = 0;
+    status.memory.used = 0;
     if (status.live) status.live.serverState = 'offline';
   }
 
@@ -399,7 +401,8 @@ function restartServer(req, res) {
   }
 }
 
-const STOP_FLAG = '/tmp/stardrop-server-stopped';
+// Persistent stop flag — stored in data volume so state survives container recreation (update.sh)
+const STOP_FLAG = `${config.DATA_DIR}/server-stopped`;
 
 // Stop game process — set stop flag so crash-monitor won't restart, then kill SMAPI
 function stopServer(req, res) {
@@ -407,6 +410,14 @@ function stopServer(req, res) {
     fs.writeFileSync(STOP_FLAG, '');
     spawnSync('sh', ['-lc', 'pkill -f "StardewModdingAPI|Stardew Valley" >/dev/null 2>&1 || true'],
       { encoding: 'utf-8', timeout: 5000 });
+    // Write offline state to live-status.json on disk immediately so "Starting..." shows correctly on next start
+    try {
+      if (fs.existsSync(config.LIVE_FILE)) {
+        const live = JSON.parse(fs.readFileSync(config.LIVE_FILE, 'utf-8'));
+        live.serverState = 'offline';
+        fs.writeFileSync(config.LIVE_FILE, JSON.stringify(live));
+      }
+    } catch {}
     cachedStatus = null;
     res.json({ success: true, message: 'Game stopped' });
   } catch (e) {

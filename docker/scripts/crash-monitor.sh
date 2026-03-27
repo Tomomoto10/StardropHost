@@ -19,7 +19,7 @@ NC='\033[0m'
 log()       { echo -e "${GREEN}[Crash-Monitor]${NC} $1"; }
 log_error() { echo -e "${RED}[Crash-Monitor]${NC} $1"; }
 
-STOP_FLAG="/tmp/stardrop-server-stopped"
+STOP_FLAG="/home/steam/web-panel/data/server-stopped"
 ENABLE_CRASH_RESTART="${ENABLE_CRASH_RESTART:-true}"
 
 RESTART_TIMES=()
