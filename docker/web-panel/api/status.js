@@ -252,13 +252,14 @@ function collectStatus(req = null) {
   }
 
   // -- Container-level memory fallback (always available via /proc/meminfo) --
-  if (status.memory.used === 0 || status.memory.limit === 2048) {
+  // Only fill 'used' if game is running — if stopped we want it to show 0
+  if (status.memory.limit === 2048 || (status.gameRunning && status.memory.used === 0)) {
     try {
       const meminfo = fs.readFileSync('/proc/meminfo', 'utf-8');
       const totalKB    = parseInt(meminfo.match(/MemTotal:\s+(\d+)/)?.[1]     || '0', 10);
       const availableKB= parseInt(meminfo.match(/MemAvailable:\s+(\d+)/)?.[1] || '0', 10);
       if (totalKB > 0) {
-        if (status.memory.used === 0)     status.memory.used  = Math.round((totalKB - availableKB) / 1024);
+        if (status.gameRunning && status.memory.used === 0) status.memory.used = Math.round((totalKB - availableKB) / 1024);
         if (status.memory.limit === 2048) status.memory.limit = Math.round(totalKB / 1024);
       }
     } catch {}
