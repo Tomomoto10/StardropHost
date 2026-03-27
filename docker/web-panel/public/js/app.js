@@ -1563,9 +1563,8 @@ function updateDashboardUI(data) {
   // Update config tab server toggle button
   updateServerToggleBtn(starting);
 
-  // Disable restart button while in any transitional state
-  const restartBtn = document.querySelector('.btn[onclick="restartServer()"]');
-  if (restartBtn) restartBtn.disabled = starting;
+  // Disable all restart buttons while in any transitional state
+  document.querySelectorAll('.btn[onclick="restartServer()"]').forEach(btn => { btn.disabled = starting; });
 
   setText('stat-players', `${data.players?.online ?? 0}/4`);
   setText('stat-uptime',  formatUptime(data.uptime || 0));
@@ -2191,12 +2190,13 @@ async function loadConfig() {
       const running = !!(lastStatusData?.gameRunning);
       const actions = document.createElement('div');
       actions.className = 'action-buttons';
+      const _dis = isTransitioning ? ' disabled' : '';
       actions.innerHTML =
         `<button id="serverToggleBtn" class="btn btn-sm ${running ? 'btn-danger' : 'btn-success'}" type="button"
-           onclick="${running ? 'stopServer()' : 'startServer()'}">
+           onclick="${running ? 'stopServer()' : 'startServer()'}"${_dis}>
            ${running ? 'Stop Server' : 'Start Server'}
          </button>
-         <button class="btn btn-sm btn-warning" type="button" onclick="restartServer()">
+         <button class="btn btn-sm btn-warning" type="button" onclick="restartServer()"${_dis}>
            Restart Server
          </button>`;
       card.appendChild(actions);
