@@ -568,7 +568,15 @@
         <!-- ── Config ─────────────────────────────────────────── -->
         <section id="page-config" class="page">
           <div id="serverModeCard" class="card" style="margin-bottom:16px"></div>
+          <div id="configContainerTop"></div>
           <div id="configContainer"></div>
+          <div class="card" style="margin-top:16px">
+            <h3>VNC & Display Settings</h3>
+            <div id="vncPanel">
+              <div class="empty-state">Loading VNC status...</div>
+            </div>
+          </div>
+          <div id="configContainerBottom"></div>
           <div class="card" style="margin-top:16px">
             <h3>Change Panel Password</h3>
             <div class="form-row">
@@ -577,13 +585,6 @@
               <button class="btn btn-primary" type="button" onclick="changePassword()">Update</button>
             </div>
           </div>
-          <div class="card" style="margin-top:16px">
-            <h3>VNC & Display Settings</h3>
-            <div id="vncPanel">
-              <div class="empty-state">Loading VNC status...</div>
-            </div>
-          </div>
-          <div id="configContainerBottom"></div>
           <div class="card" style="margin-top:16px;border-color:#ef444433">
             <h3 style="color:#ef4444">Danger Zone</h3>
             <div style="display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap">

@@ -1938,12 +1938,16 @@ async function loadConfig() {
   if (!data) return;
 
   const container       = document.getElementById('configContainer');
+  const containerTop    = document.getElementById('configContainerTop');
   const containerBottom = document.getElementById('configContainerBottom');
   container.innerHTML       = '';
+  if (containerTop)    containerTop.innerHTML    = '';
   if (containerBottom) containerBottom.innerHTML = '';
 
+  // Groups rendered above the main config (below server mode card)
+  const TOP_GROUPS    = new Set(['Server']);
   // Groups rendered below the VNC card
-  const BOTTOM_GROUPS = new Set(['Server', 'Monitoring']);
+  const BOTTOM_GROUPS = new Set(['Monitoring']);
 
   const deferredTzPickers = [];
 
@@ -1951,7 +1955,9 @@ async function loadConfig() {
     // VNC & Display settings are rendered inside the VNC panel card below
     if (group.name === 'VNC & Display') continue;
 
-    const target = (containerBottom && BOTTOM_GROUPS.has(group.name)) ? containerBottom : container;
+    const target = (containerTop    && TOP_GROUPS.has(group.name))    ? containerTop
+                 : (containerBottom && BOTTOM_GROUPS.has(group.name)) ? containerBottom
+                 : container;
 
     const card = document.createElement('div');
     card.className = 'card config-group';
@@ -2112,7 +2118,7 @@ async function loadVnc() {
       </div>
     </div>
     <div class="action-buttons" style="margin-bottom:16px">
-      ${vnc?.running
+      ${vnc?.enabled
         ? `<button class="btn btn-sm" style="color:#ef4444;border-color:#ef4444" onclick="vncDisable()">Stop VNC</button>`
         : `<button class="btn btn-sm btn-success" onclick="vncEnable()">Start VNC Now</button>`}
     </div>
