@@ -178,7 +178,7 @@ function collectStatus(req = null) {
       }
       if (data.game) {
         status.players.online = data.game.players_online || 0;
-        if (data.game.day) status.day = data.game.day;
+        if (data.game.day && status.gameRunning) status.day = data.game.day;
         if (typeof data.game.paused === 'boolean') status.paused = data.game.paused;
       }
       if (data.resources) {
