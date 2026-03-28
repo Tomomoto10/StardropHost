@@ -126,27 +126,11 @@ function getNetworkInfo(requestHost = '') {
 
 // -- Get effective CPU core count for normalisation --
 // BUG FIX: ps reports CPU per-core so divide by allocated cores to get true %.
-// When a Docker CPU limit is set, use the cgroup quota; otherwise use nproc.
+// CPU_LIMIT env var (set from docker-compose.yml) is the most reliable source.
 function getCoreCount() {
-  // cgroupv2: /sys/fs/cgroup/cpu.max — "quota period" or "max period"
-  try {
-    const val = fs.readFileSync('/sys/fs/cgroup/cpu.max', 'utf-8').trim();
-    const [quota, period] = val.split(' ');
-    if (quota !== 'max' && period) {
-      const cores = parseInt(quota, 10) / parseInt(period, 10);
-      if (cores > 0) return cores;
-    }
-  } catch {}
+  const envLimit = parseFloat(process.env.CPU_LIMIT || '0');
+  if (envLimit > 0) return envLimit;
 
-  // cgroupv1: quota_us / period_us
-  try {
-    const quota  = parseInt(fs.readFileSync('/sys/fs/cgroup/cpu/cpu.cfs_quota_us',  'utf-8').trim(), 10);
-    const period = parseInt(fs.readFileSync('/sys/fs/cgroup/cpu/cpu.cfs_period_us', 'utf-8').trim(), 10);
-    // -1 means no limit in cgroupv1
-    if (quota > 0 && period > 0) return quota / period;
-  } catch {}
-
-  // No CPU limit — fall back to host core count
   try {
     return parseInt(execSync('nproc', { encoding: 'utf-8' }).trim(), 10) || 1;
   } catch {
@@ -268,33 +252,23 @@ function collectStatus(req = null) {
     if (status.live) status.live.serverState = 'offline';
   }
 
-  // -- Container memory limit (cgroup) and used fallback --
-  // Read the actual Docker-imposed memory limit from cgroup rather than /proc/meminfo
-  // (which shows host RAM when no limit is set).
+  // -- Container memory limit --
+  // MEMORY_LIMIT env var (from docker-compose.yml) is the most reliable source.
   if (status.memory.limit === 2048) {
-    let cgroupLimitMB = null;
-
-    // cgroupv2
-    try {
-      const val = fs.readFileSync('/sys/fs/cgroup/memory.max', 'utf-8').trim();
-      if (val !== 'max') {
-        const bytes = parseInt(val, 10);
-        if (bytes > 0 && bytes < 1e15) cgroupLimitMB = Math.round(bytes / 1024 / 1024);
+    const envMem = (process.env.MEMORY_LIMIT || '').trim().toLowerCase();
+    let envLimitMB = 0;
+    if (envMem) {
+      const m = envMem.match(/^(\d+(?:\.\d+)?)([gmbk]?)$/);
+      if (m) {
+        const n = parseFloat(m[1]);
+        envLimitMB = m[2] === 'g' ? Math.round(n * 1024)
+                   : m[2] === 'm' ? Math.round(n)
+                   : m[2] === 'k' ? Math.round(n / 1024)
+                   : Math.round(n / 1024 / 1024);
       }
-    } catch {}
-
-    // cgroupv1
-    if (cgroupLimitMB === null) {
-      try {
-        const val = fs.readFileSync('/sys/fs/cgroup/memory/memory.limit_in_bytes', 'utf-8').trim();
-        const bytes = parseInt(val, 10);
-        // cgroupv1 reports ~9.2e18 when no limit is set
-        if (bytes > 0 && bytes < 1e15) cgroupLimitMB = Math.round(bytes / 1024 / 1024);
-      } catch {}
     }
-
-    if (cgroupLimitMB !== null) {
-      status.memory.limit = cgroupLimitMB;
+    if (envLimitMB > 0) {
+      status.memory.limit = envLimitMB;
     } else {
       // No limit set — fall back to host total from /proc/meminfo
       try {

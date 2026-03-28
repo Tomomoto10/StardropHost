@@ -70,6 +70,8 @@ services:
       - PANEL_PORT=${PANEL_PORT:-18642}
       - SERVER_MODE=${SERVER_MODE:-lan}
       - STEAM_AUTH_URL=http://stardrop-steam-auth:18700
+      - CPU_LIMIT=${CPU_LIMIT:-}
+      - MEMORY_LIMIT=${MEMORY_LIMIT:-}
     ports:
       - "${GAME_PORT:-24642}:24642/udp"
       - "${VNC_PORT:-5900}:5900"
