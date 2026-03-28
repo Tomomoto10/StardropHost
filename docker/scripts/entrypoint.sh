@@ -463,67 +463,37 @@ else
     log_warn "⚠️  StardropDashboard source not found at $SD_SRC — skipping"
 fi
 
-# -- Step 3.55: Build AutoHideHost mod (translated source replaces pre-built DLL) --
-log_step "Step 3.55: Building AutoHideHost mod..."
+# -- Step 3.6: Build StardropHost.Dependencies mod --
+# Combined server management mod — replaces AlwaysOnServer, AutoHideHost,
+# StardropGameManager, and SkillLevelGuard with a single source-built mod.
+log_step "Step 3.6: Building StardropHost.Dependencies mod..."
 
-AHH_SRC="/home/steam/mod-source/AutoHideHost"
-AHH_DEST="/home/steam/preinstalled-mods/AutoHideHost"
+DEP_SRC="/home/steam/mod-source/StardropHost.Dependencies"
+DEP_DEST="/home/steam/preinstalled-mods/StardropHost.Dependencies"
 
-if [ -f "$AHH_DEST/AutoHideHost.dll" ]; then
-    log_info "✅ AutoHideHost already built"
-elif [ -d "$AHH_SRC" ]; then
-    log_info "Building AutoHideHost against game files..."
-    dotnet build "$AHH_SRC" -c Release \
+if [ -f "$DEP_DEST/StardropHost.Dependencies.dll" ]; then
+    log_info "✅ StardropHost.Dependencies already built"
+elif [ -d "$DEP_SRC" ]; then
+    log_info "Building StardropHost.Dependencies against game files..."
+    dotnet build "$DEP_SRC" -c Release \
         /p:GamePath=/home/steam/stardewvalley \
         /p:EnableModDeploy=false \
         /p:EnableModZip=false \
         2>&1
 
-    AHH_OUT="$AHH_SRC/bin/Release/net6.0"
-    if [ -f "$AHH_OUT/AutoHideHost.dll" ]; then
-        mkdir -p "$AHH_DEST"
-        cp "$AHH_OUT/AutoHideHost.dll" "$AHH_DEST/"
-        chown -R steam:steam "$AHH_DEST" 2>/dev/null || true
-        log_info "✅ AutoHideHost built and staged"
+    DEP_OUT="$DEP_SRC/bin/Release/net6.0"
+    if [ -f "$DEP_OUT/StardropHost.Dependencies.dll" ]; then
+        mkdir -p "$DEP_DEST"
+        cp "$DEP_OUT/StardropHost.Dependencies.dll" "$DEP_DEST/"
+        cp "$DEP_SRC/manifest.json"                 "$DEP_DEST/"
+        chown -R steam:steam "$DEP_DEST" 2>/dev/null || true
+        log_info "✅ StardropHost.Dependencies built and staged"
     else
-        log_warn "⚠️  AutoHideHost build failed — using pre-built version"
-    fi
-else
-    log_warn "⚠️  AutoHideHost source not found at $AHH_SRC — using pre-built version"
-fi
-
-# -- Step 3.6: Build StardropGameManager mod --
-# Headless co-op startup orchestrator — replaces both FarmAutoCreate and ServerAutoLoad.
-# Loads the most recent save as co-op host, or creates a new native co-op farm from
-# new-farm.json using the CoopMenu.HostNewFarmSlot path (Steam invite codes work correctly).
-log_step "Step 3.6: Building StardropGameManager mod..."
-
-SGM_SRC="/home/steam/mod-source/StardropGameManager"
-SGM_DEST="/home/steam/preinstalled-mods/StardropGameManager"
-
-if [ -f "$SGM_DEST/StardropGameManager.dll" ]; then
-    log_info "✅ StardropGameManager already built"
-elif [ -d "$SGM_SRC" ]; then
-    log_info "Building StardropGameManager against game files..."
-    dotnet build "$SGM_SRC" -c Release \
-        /p:GamePath=/home/steam/stardewvalley \
-        /p:EnableModDeploy=false \
-        /p:EnableModZip=false \
-        2>&1
-
-    SGM_OUT="$SGM_SRC/bin/Release/net6.0"
-    if [ -f "$SGM_OUT/StardropGameManager.dll" ]; then
-        mkdir -p "$SGM_DEST"
-        cp "$SGM_OUT/StardropGameManager.dll" "$SGM_DEST/"
-        cp "$SGM_SRC/manifest.json"           "$SGM_DEST/"
-        chown -R steam:steam "$SGM_DEST" 2>/dev/null || true
-        log_info "✅ StardropGameManager built and staged"
-    else
-        log_warn "⚠️  StardropGameManager build failed — server will not auto-load or create farms"
+        log_warn "⚠️  StardropHost.Dependencies build failed — server will not run correctly"
         log_warn "    Check the build output above for C# compile errors"
     fi
 else
-    log_warn "⚠️  StardropGameManager source not found at $SGM_SRC — skipping"
+    log_warn "⚠️  StardropHost.Dependencies source not found at $DEP_SRC — skipping"
 fi
 
 # -- Step 4: Install mods --
@@ -531,11 +501,15 @@ log_step "Step 4: Installing mods..."
 
 mkdir -p /home/steam/stardewvalley/Mods
 
-# Remove mods that have been replaced in this version, so stale DLLs
+# Remove mods replaced by StardropHost.Dependencies, so stale DLLs
 # from a previous install on the volume-mounted game directory don't linger.
-rm -rf /home/steam/stardewvalley/Mods/FarmAutoCreate  2>/dev/null || true
-rm -rf /home/steam/stardewvalley/Mods/ServerAutoLoad   2>/dev/null || true
-rm -rf /home/steam/stardewvalley/Mods/ServerDashboard  2>/dev/null || true
+rm -rf /home/steam/stardewvalley/Mods/AlwaysOnServer        2>/dev/null || true
+rm -rf /home/steam/stardewvalley/Mods/AutoHideHost          2>/dev/null || true
+rm -rf /home/steam/stardewvalley/Mods/SkillLevelGuard       2>/dev/null || true
+rm -rf /home/steam/stardewvalley/Mods/StardropGameManager   2>/dev/null || true
+rm -rf /home/steam/stardewvalley/Mods/FarmAutoCreate        2>/dev/null || true
+rm -rf /home/steam/stardewvalley/Mods/ServerAutoLoad        2>/dev/null || true
+rm -rf /home/steam/stardewvalley/Mods/ServerDashboard       2>/dev/null || true
 
 if [ -d "/home/steam/preinstalled-mods" ]; then
     log_info "Installing mods..."

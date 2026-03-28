@@ -77,27 +77,29 @@ RUN wget -qO- 'https://steamcdn-a.akamaihd.net/client/installer/steamcmd_linux.t
     unzip -q smapi.zip -d smapi && \
     rm smapi.zip
 
-# -- Copy pre-built mods (AlwaysOnServer, AutoHideHost, SkillLevelGuard) --
-# Note: ServerAutoLoad removed — replaced by StardropGameManager source mod.
+# -- Copy pre-built mods (none remain — all replaced by source-built mods) --
+# AlwaysOnServer, AutoHideHost, SkillLevelGuard, ServerAutoLoad all replaced
+# by StardropHost.Dependencies. The mods/ folder is kept for MODS_LIST.md only.
 USER root
 COPY mods/ /home/steam/preinstalled-mods/
-RUN rm -rf /home/steam/preinstalled-mods/ServerAutoLoad && \
+RUN rm -rf /home/steam/preinstalled-mods/AlwaysOnServer \
+           /home/steam/preinstalled-mods/AutoHideHost \
+           /home/steam/preinstalled-mods/ServerAutoLoad \
+           /home/steam/preinstalled-mods/SkillLevelGuard && \
     chown -R steam:steam /home/steam/preinstalled-mods && \
     chmod -R 755 /home/steam/preinstalled-mods
 
 # -- Copy SMAPI mod sources + pre-restore NuGet packages --
-# The actual dotnet builds happen in entrypoint.sh (Steps 3.5/3.6) after
+# The actual dotnet builds happen in entrypoint.sh (Step 3.5 onwards) after
 # game files are mounted, because ModBuildConfig needs StardewValley.dll
 # which is only available at runtime, not at image build time.
 # Pre-restoring HERE (as steam) caches NuGet packages into /home/steam/.nuget
 # so the runtime dotnet build (also run as steam) can find them offline.
 COPY --chown=steam:steam mods-source/StardropDashboard/           /home/steam/mod-source/StardropDashboard/
-COPY --chown=steam:steam mods-source/StardropGameManager/       /home/steam/mod-source/StardropGameManager/
-COPY --chown=steam:steam mods-source/AutoHideHost_v1.0.1/       /home/steam/mod-source/AutoHideHost/
+COPY --chown=steam:steam mods-source/StardropHost.Dependencies/   /home/steam/mod-source/StardropHost.Dependencies/
 USER steam
-RUN cd /home/steam/mod-source/StardropDashboard     && dotnet restore 2>&1 || true && \
-    cd /home/steam/mod-source/StardropGameManager && dotnet restore 2>&1 || true && \
-    cd /home/steam/mod-source/AutoHideHost        && dotnet restore 2>&1 || true
+RUN cd /home/steam/mod-source/StardropDashboard          && dotnet restore 2>&1 || true && \
+    cd /home/steam/mod-source/StardropHost.Dependencies  && dotnet restore 2>&1 || true
 
 # -- Copy scripts --
 COPY --chown=steam:steam scripts/entrypoint.sh /home/steam/entrypoint.sh

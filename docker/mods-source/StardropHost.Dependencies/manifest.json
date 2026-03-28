@@ -1,0 +1,11 @@
+{
+  "Name": "StardropHost.Dependencies",
+  "Author": "StardropHost",
+  "Version": "1.0.0",
+  "Description": "Combined server management mod for StardropHost. Handles game loading, host hiding, headless server operation, and new farm creation. Replaces AlwaysOnServer, AutoHideHost, StardropGameManager, and SkillLevelGuard.",
+  "UniqueID": "stardrop.Dependencies",
+  "EntryDll": "StardropHost.Dependencies.dll",
+  "MinimumApiVersion": "4.0.0",
+  "MinimumGameVersion": "1.6.0",
+  "UpdateKeys": []
+}
