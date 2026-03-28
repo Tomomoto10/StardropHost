@@ -46,7 +46,6 @@ const CONFIG_SCHEMA = {
         { value: '8g',  label: '8 GB' },
         { value: '16g', label: '16 GB' },
       ] },
-    { key: 'LOW_PERF_MODE', label: 'Low Performance Mode', type: 'boolean', default: 'false' },
   ],
   'Backup': [
     { key: 'ENABLE_AUTO_BACKUP',     label: 'Auto Backup',               type: 'boolean', default: 'true' },

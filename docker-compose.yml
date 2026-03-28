@@ -57,10 +57,9 @@ services:
         condition: service_completed_successfully
     environment:
       - USE_GPU=${USE_GPU:-false}
-      - LOW_PERF_MODE=${LOW_PERF_MODE:-false}
       - ENABLE_VNC=${ENABLE_VNC:-false}
       - VNC_PASSWORD=${VNC_PASSWORD:-stardew1}
-      - DISPLAY_PRESET=${DISPLAY_PRESET:-1280x720@60}
+      - DISPLAY_PRESET=${DISPLAY_PRESET:-800x600@30}
       - ENABLE_AUTO_BACKUP=${ENABLE_AUTO_BACKUP:-true}
       - ENABLE_CRASH_RESTART=${ENABLE_CRASH_RESTART:-true}
       - ENABLE_LOG_MONITOR=${ENABLE_LOG_MONITOR:-true}

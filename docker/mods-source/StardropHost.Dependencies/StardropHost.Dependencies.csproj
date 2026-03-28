@@ -12,6 +12,8 @@
   <ItemGroup>
     <!-- Handles StardewValley.dll + StardewModdingAPI.dll references via GamePath -->
     <PackageReference Include="Pathoschild.Stardew.ModBuildConfig" Version="4.*" />
+    <!-- Harmony 2.x — required for BeginDraw / sound / input patches -->
+    <PackageReference Include="Lib.Harmony" Version="2.*" />
   </ItemGroup>
 
 </Project>

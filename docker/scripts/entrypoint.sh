@@ -37,16 +37,11 @@ load_panel_env_overrides() {
 
 load_panel_env_overrides
 
-# -- Resolution defaults --
-DEFAULT_RESOLUTION_WIDTH=1280
-DEFAULT_RESOLUTION_HEIGHT=720
-DEFAULT_REFRESH_RATE=60
-LOW_PERF_DEFAULT_WIDTH=800
-LOW_PERF_DEFAULT_HEIGHT=600
-LOW_PERF_DEFAULT_FPS=30
-LOW_PERF_DEFAULT_COLOR_DEPTH=24  # must stay 24 — MonoGame OpenGL init fails with 16-bit depth
+# -- Resolution defaults (headless server — low as possible, override via DISPLAY_PRESET) --
+DEFAULT_RESOLUTION_WIDTH=800
+DEFAULT_RESOLUTION_HEIGHT=600
+DEFAULT_REFRESH_RATE=30
 
-LOW_PERF_MODE=${LOW_PERF_MODE:-false}
 TARGET_FPS_RAW=${TARGET_FPS:-}
 
 # Parse DISPLAY_PRESET (e.g. "1920x1080@60") into individual vars if set
@@ -86,23 +81,11 @@ configure_audio_driver() {
     fi
 }
 
-# -- Performance mode --
-configure_performance_mode() {
-    [ "$LOW_PERF_MODE" = "true" ] || return 0
-
-    RESOLUTION_WIDTH=${LOW_PERF_RESOLUTION_WIDTH:-$LOW_PERF_DEFAULT_WIDTH}
-    RESOLUTION_HEIGHT=${LOW_PERF_RESOLUTION_HEIGHT:-$LOW_PERF_DEFAULT_HEIGHT}
-
-    if [ -z "$TARGET_FPS_RAW" ]; then
-        TARGET_FPS=$LOW_PERF_DEFAULT_FPS
-    fi
-    REFRESH_RATE=${LOW_PERF_REFRESH_RATE:-$TARGET_FPS}
-    XVFB_COLOR_DEPTH=${LOW_PERF_COLOR_DEPTH:-$LOW_PERF_DEFAULT_COLOR_DEPTH}
-
+# -- Headless server baseline config (always applied) --
+configure_headless_mode() {
     export SDL_VIDEODRIVER=${SDL_VIDEODRIVER:-x11}
     export SDL_AUDIODRIVER=${SDL_AUDIODRIVER:-dummy}
     export MONO_GC_PARAMS=${MONO_GC_PARAMS:-nursery-size=8m}
-    export DOTNET_GCHeapHardLimit=${DOTNET_GCHeapHardLimit:-0x30000000}
 
     if [ "${USE_GPU:-false}" != "true" ]; then
         export LIBGL_ALWAYS_SOFTWARE=${LIBGL_ALWAYS_SOFTWARE:-1}
@@ -115,17 +98,12 @@ configure_performance_mode() {
         XVFB_FB_DIR=""
         XVFB_FB_ARGS=()
     fi
-
-    log_info "Low performance mode enabled"
-    log_info "  Render: ${RESOLUTION_WIDTH}x${RESOLUTION_HEIGHT} @ ${REFRESH_RATE}fps"
-    log_info "  Color depth: ${XVFB_COLOR_DEPTH}bit"
 }
 
-# -- Startup preferences tuning --
+# -- Startup preferences tuning (always applied — headless server has no use for sound/high-res) --
 apply_startup_preferences_tuning() {
     local config_file=$1
     [ -f "$config_file" ] || return 0
-    [ "$LOW_PERF_MODE" = "true" ] || return 0
 
     perl -0pi -e "
         s#<fullscreenResolutionX>.*?</fullscreenResolutionX>#<fullscreenResolutionX>${RESOLUTION_WIDTH}</fullscreenResolutionX>#s;
@@ -307,7 +285,7 @@ start_gpu_xorg() {
 # ===========================================
 
 configure_audio_driver
-configure_performance_mode
+configure_headless_mode
 
 if [ "$(id -u)" = "0" ]; then
     log_step "================================================"
