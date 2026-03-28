@@ -22,7 +22,6 @@ using System.Linq;
 using System.Reflection;
 using System.Text.Json;
 using System.Text.Json.Serialization;
-using HarmonyLib;
 using Microsoft.Xna.Framework;
 using StardewModdingAPI;
 using StardewModdingAPI.Events;
@@ -80,19 +79,6 @@ namespace StardropHostDependencies
             helper.Events.Multiplayer.PeerConnected    += OnPeerConnected;
             helper.Events.Multiplayer.PeerDisconnected += OnPeerDisconnected;
             helper.Events.Player.Warped             += OnWarped;
-
-            var harmony = new Harmony(ModManifest.UniqueID);
-            try
-            {
-                harmony.Patch(
-                    original: AccessTools.Method("StardewValley.Network.GameServer:broadcastPlayerIntroduction"),
-                    prefix:   new HarmonyMethod(typeof(ModEntry), nameof(SkipHostIntroduction)));
-                Monitor.Log("[HostBot] Patched broadcastPlayerIntroduction — host hidden from join popup.", LogLevel.Info);
-            }
-            catch (Exception ex)
-            {
-                Monitor.Log($"[HostBot] broadcastPlayerIntroduction patch failed: {ex.Message}", LogLevel.Warn);
-            }
 
             Monitor.Log("StardropHost.Dependencies loaded.", LogLevel.Info);
         }
@@ -669,16 +655,6 @@ namespace StardropHostDependencies
                     _petHandled = true; // don't get stuck
                 }
             }
-        }
-
-        // ════════════════════════════════════════════════════════════════════
-        // HARMONY PATCHES
-        // ════════════════════════════════════════════════════════════════════
-
-        /// <summary>Suppress the host's player introduction being sent to joining clients.</summary>
-        private static bool SkipHostIntroduction(Farmer farmer)
-        {
-            return !farmer.IsMainPlayer; // false = skip original for host
         }
 
         // ════════════════════════════════════════════════════════════════════

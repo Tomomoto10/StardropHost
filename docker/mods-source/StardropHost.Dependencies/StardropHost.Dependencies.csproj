@@ -12,8 +12,6 @@
   <ItemGroup>
     <!-- Handles StardewValley.dll + StardewModdingAPI.dll references via GamePath -->
     <PackageReference Include="Pathoschild.Stardew.ModBuildConfig" Version="4.*" />
-    <!-- Harmony — provided by SMAPI at runtime, compile-only reference here -->
-    <PackageReference Include="0Harmony" Version="2.*" ExcludeAssets="runtime" />
   </ItemGroup>
 
 </Project>

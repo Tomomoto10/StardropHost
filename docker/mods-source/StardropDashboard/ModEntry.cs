@@ -110,6 +110,8 @@ namespace StardropDashboard
                         Money        = farmer.Money,
                         TotalEarned  = (long)farmer.totalMoneyEarned,
                         LocationName = farmer.currentLocation?.Name ?? "",
+                        TileX        = (int)farmer.getTileLocation().X,
+                        TileY        = (int)farmer.getTileLocation().Y,
                         DaysPlayed   = (int)farmer.stats.DaysPlayed,
                         Skills       = new SkillData
                         {

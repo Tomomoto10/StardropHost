@@ -1596,6 +1596,8 @@ function updateDashboardUI(data) {
 }
 
 // ─── Farm ────────────────────────────────────────────────────────
+function capitalize(s) { return s ? s.charAt(0).toUpperCase() + s.slice(1).toLowerCase() : s; }
+
 async function loadFarm() {
   const data = await API.get('/api/farm/overview');
   if (!data) return;
@@ -1610,23 +1612,26 @@ async function loadFarm() {
     return;
   }
 
-  // Live status
-  const players = data.players?.length
-    ? data.players.map(p => `<div class="player-card">
+  // Farm tab players — quick overview: name + location only
+  const farmPlayers = (data.players || []).filter(p => !p.isHost);
+  const playersHtml = farmPlayers.length
+    ? farmPlayers.map(p => `<div class="player-card">
         <div class="player-avatar">${icon('players', 'icon')}</div>
         <div>
           <div class="player-name">${escapeHtml(p.name)}</div>
-          ${p.location ? `<div class="player-info">${escapeHtml(p.location)}</div>` : ''}
-          ${p.health != null ? `<div class="player-info">HP ${p.health}/${p.maxHealth} · ⚡ ${p.stamina ?? '--'}</div>` : ''}
+          ${p.locationName ? `<div class="player-info">${escapeHtml(p.locationName)}</div>` : ''}
         </div>
       </div>`).join('')
     : '<div class="empty-state">No players online</div>';
+
+  const season  = capitalize(data.season);
+  const weather = capitalize(data.weather);
 
   liveEl.innerHTML = `
     <div class="details-grid">
       <div class="detail-item">
         <div class="detail-label">Date</div>
-        <div class="detail-value">${escapeHtml(data.season || '--')} ${data.day ?? '--'}, Year ${data.year ?? '--'}</div>
+        <div class="detail-value">${escapeHtml(season || '--')} ${data.day ?? '--'}, Year ${data.year ?? '--'}</div>
       </div>
       <div class="detail-item">
         <div class="detail-label">Time</div>
@@ -1634,15 +1639,14 @@ async function loadFarm() {
       </div>
       <div class="detail-item">
         <div class="detail-label">Weather</div>
-        <div class="detail-value">${escapeHtml(data.weather || '--')}</div>
+        <div class="detail-value">${escapeHtml(weather || '--')}</div>
       </div>
       <div class="detail-item">
         <div class="detail-label">Server</div>
-        <div class="detail-value">${escapeHtml(data.serverState || '--')}</div>
+        <div class="detail-value">${escapeHtml(capitalize(data.serverState) || '--')}</div>
       </div>
     </div>
-    <div style="margin-top:12px">${players}</div>
-    ${!data.liveDataAvailable ? '<div style="margin-top:8px;color:var(--text-muted);font-size:13px">Live data unavailable — StardropDashboard mod not installed (Phase 6)</div>' : ''}
+    <div style="margin-top:12px">${playersHtml}</div>
   `;
 
   // Community Center
@@ -1670,16 +1674,12 @@ async function loadFarm() {
     ccEl.innerHTML = '<div class="empty-state">Community Center data not available</div>';
   }
 
-  // Farm info
+  // Farm info — no Farmer field
   infoEl.innerHTML = `
     <div class="details-grid">
       <div class="detail-item">
         <div class="detail-label">Farm Name</div>
         <div class="detail-value">${escapeHtml(data.farmName || '--')}</div>
-      </div>
-      <div class="detail-item">
-        <div class="detail-label">Farmer</div>
-        <div class="detail-value">${escapeHtml(data.playerName || '--')}</div>
       </div>
       <div class="detail-item">
         <div class="detail-label">Farm Type</div>
@@ -1773,32 +1773,75 @@ function appendTerminalOutput(text) {
 }
 
 // ─── Players ─────────────────────────────────────────────────────
+function renderPlayerStats(p) {
+  const parts = [];
+  if (p.health != null)  parts.push(`❤️ ${p.health}/${p.maxHealth}`);
+  if (p.stamina != null) parts.push(`⚡ ${p.stamina}/${p.maxStamina}`);
+  const statsLine = parts.length ? `<div class="player-info">${parts.join(' &nbsp;·&nbsp; ')}</div>` : '';
+
+  const s = p.skills;
+  const skillsLine = s ? `<div class="player-info" style="font-size:11px;color:var(--text-muted)">
+    🌱${s.farming} ⛏${s.mining} 🌲${s.foraging} 🎣${s.fishing} ⚔️${s.combat} 🍀${s.luck}
+  </div>` : '';
+
+  return statsLine + skillsLine;
+}
+
+function timeAgo(ms) {
+  const s = Math.floor((Date.now() - ms) / 1000);
+  if (s < 60)   return `${s}s ago`;
+  if (s < 3600) return `${Math.floor(s/60)}m ago`;
+  return `${Math.floor(s/3600)}h ago`;
+}
+
 async function loadPlayers() {
   const data = await API.get('/api/players');
   if (!data) return;
 
   const list = document.getElementById('playersList');
-  setText('playerCount', `${data.online ?? 0} / 8`);
+  setText('playerCount', `${data.online ?? 0} / 4`);
 
   if (!data.players?.length) {
     list.innerHTML = `<div class="empty-state">${icon('players', 'icon empty-icon')}<div>No players online</div></div>`;
-    return;
+  } else {
+    list.innerHTML = data.players.map(p => `
+      <div class="player-card">
+        <div class="player-avatar">${icon('players', 'icon')}</div>
+        <div class="player-body">
+          <div class="player-name">${escapeHtml(p.name)}</div>
+          ${p.location ? `<div class="player-info">${escapeHtml(p.location)}</div>` : ''}
+          ${renderPlayerStats(p)}
+        </div>
+        <div class="player-actions">
+          <button class="btn btn-sm" onclick="kickPlayer('${escapeHtml(p.id)}','${escapeHtml(p.name)}')">Kick</button>
+          <button class="btn btn-sm" style="color:#ef4444;border-color:#ef4444" onclick="banPlayer('${escapeHtml(p.id)}','${escapeHtml(p.name)}')">Ban</button>
+          <button class="btn btn-sm" onclick="grantAdmin('${escapeHtml(p.id)}','${escapeHtml(p.name)}')">Admin</button>
+        </div>
+      </div>
+    `).join('');
   }
 
-  list.innerHTML = data.players.map(p => `
-    <div class="player-card">
-      <div class="player-avatar">${icon('players', 'icon')}</div>
-      <div class="player-body">
-        <div class="player-name">${escapeHtml(p.name)}</div>
-        ${p.location ? `<div class="player-info">${escapeHtml(p.location)}</div>` : ''}
+  // Recent Players card
+  const recentCard = document.getElementById('recentPlayersCard');
+  const recentList = document.getElementById('recentPlayersList');
+  const recent = (data.recentPlayers || []).filter(p => p.name);
+
+  if (recent.length) {
+    recentCard.style.display = '';
+    recentList.innerHTML = recent.map(p => `
+      <div class="player-card">
+        <div class="player-avatar" style="opacity:0.5">${icon('players', 'icon')}</div>
+        <div class="player-body">
+          <div class="player-name">${escapeHtml(p.name)}</div>
+          <div class="player-info" style="color:var(--text-muted)">Last seen ${timeAgo(p.lastSeen)}</div>
+          ${p.location ? `<div class="player-info">${escapeHtml(p.location)}</div>` : ''}
+          ${renderPlayerStats(p)}
+        </div>
       </div>
-      <div class="player-actions">
-        <button class="btn btn-sm" onclick="kickPlayer('${escapeHtml(p.id)}','${escapeHtml(p.name)}')">Kick</button>
-        <button class="btn btn-sm" style="color:#ef4444;border-color:#ef4444" onclick="banPlayer('${escapeHtml(p.id)}','${escapeHtml(p.name)}')">Ban</button>
-        <button class="btn btn-sm" onclick="grantAdmin('${escapeHtml(p.id)}','${escapeHtml(p.name)}')">Admin</button>
-      </div>
-    </div>
-  `).join('');
+    `).join('');
+  } else {
+    recentCard.style.display = 'none';
+  }
 }
 
 async function kickPlayer(id, name) {

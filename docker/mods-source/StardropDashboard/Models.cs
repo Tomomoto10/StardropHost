@@ -33,8 +33,10 @@ namespace StardropDashboard
         public int    Money         { get; set; }
         public long   TotalEarned   { get; set; }
         public string LocationName  { get; set; } = "";
-        public SkillData Skills     { get; set; } = new();
-        public int    DaysPlayed    { get; set; }
+        public int    TileX        { get; set; }
+        public int    TileY        { get; set; }
+        public SkillData Skills    { get; set; } = new();
+        public int    DaysPlayed   { get; set; }
     }
 
     public class SkillData

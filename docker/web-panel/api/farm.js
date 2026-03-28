@@ -181,8 +181,9 @@ function readLiveStatus() {
     const data = JSON.parse(fs.readFileSync(config.LIVE_FILE, 'utf-8'));
 
     // Reject stale data (older than 30s)
+    // timestamp is Unix seconds from C# mod — multiply by 1000 to compare with Date.now() (ms)
     if (data.timestamp) {
-      const age = Date.now() - new Date(data.timestamp).getTime();
+      const age = Date.now() - (data.timestamp * 1000);
       if (age > 30000) return null;
     }
 
@@ -220,7 +221,7 @@ function getFarmOverview(req, res) {
     season:     live?.season     ?? saveData?.season  ?? null,
     day:        live?.day        ?? saveData?.day      ?? null,
     year:       live?.year       ?? saveData?.year     ?? null,
-    timeOfDay:  live?.timeOfDay  ?? null,
+    timeOfDay:  live?.gameTimeMinutes ?? null,
     weather:    live?.weather    ?? null,
     serverState: live?.serverState ?? null,
 

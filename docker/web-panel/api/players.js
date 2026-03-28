@@ -16,6 +16,11 @@ const MAX_PLAYER_HISTORY = 288;
 let connectedPlayers = [];
 let lastLogParse = 0;
 
+// -- Recent players tracking --
+const playerSnapshots = new Map(); // id → rich player data from live-status.json
+const recentPlayers   = new Map(); // id → { ...playerData, lastSeen }
+const RECENT_EXPIRE_MS = 24 * 60 * 60 * 1000;
+
 // -- Ban list --
 const BAN_LIST_FILE = require('path').join(config.DATA_DIR, 'bans.json');
 
@@ -96,19 +101,29 @@ function getPlayersFromLiveStatus() {
     if (fs.existsSync(config.LIVE_FILE)) {
       const live = JSON.parse(fs.readFileSync(config.LIVE_FILE, 'utf-8'));
       if (live.players?.length > 0) {
-        return live.players
+        const online = live.players
           .filter(p => p.isOnline && !p.isHost)
           .map(p => ({
-            id:        p.uniqueId,
-            name:      p.name || formatPlayerId(p.uniqueId),
-            joinedAt:  null,
-            isOnline:  true,
-            health:    p.health,
-            maxHealth: p.maxHealth,
-            stamina:   p.stamina,
-            money:     p.money,
-            location:  p.locationName,
+            id:         p.uniqueId,
+            name:       p.name || formatPlayerId(p.uniqueId),
+            joinedAt:   null,
+            isOnline:   true,
+            health:     p.health,
+            maxHealth:  p.maxHealth,
+            stamina:    Math.floor(p.stamina ?? 0),
+            maxStamina: Math.floor(p.maxStamina ?? 0),
+            money:      p.money,
+            location:   p.locationName,
+            skills:     p.skills,
+            daysPlayed: p.daysPlayed,
+            tileX:      p.tileX,
+            tileY:      p.tileY,
           }));
+
+        // Update snapshots for all currently online players
+        for (const p of online) playerSnapshots.set(p.id, p);
+
+        return online;
       }
     }
   } catch {}
@@ -169,10 +184,26 @@ function getPlayers(req, res) {
   const players     = livePlayers || logPlayers;
   const online      = getOnlineCount();
 
+  // Detect disconnects: players in snapshots but not currently online → move to recent
+  const onlineIds = new Set(players.map(p => p.id));
+  for (const [id, snapshot] of playerSnapshots) {
+    if (!onlineIds.has(id)) {
+      recentPlayers.set(id, { ...snapshot, lastSeen: Date.now() });
+      playerSnapshots.delete(id);
+    }
+  }
+
+  // Expire recent players older than 24h
+  const now = Date.now();
+  for (const [id, p] of recentPlayers) {
+    if (now - p.lastSeen > RECENT_EXPIRE_MS) recentPlayers.delete(id);
+  }
+
   res.json({
     online: Math.max(online, players.length),
     max: 4,
     players,
+    recentPlayers: Array.from(recentPlayers.values()).sort((a, b) => b.lastSeen - a.lastSeen),
     history: playerHistory,
   });
 }
