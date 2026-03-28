@@ -1613,6 +1613,48 @@ function updateDashboardUI(data) {
   setText('detail-local-ips', net.localIps?.[0] || '--');
   setText('detail-vnc',       data.vncEnabled ? `Enabled — port ${net.vncPort || 5900}` : 'Disabled');
 
+  // Panel update notification (StardropHost itself)
+  const panelNotif = document.getElementById('panelUpdateNotification');
+  if (panelNotif) {
+    if (data.panelUpdateAvailable) {
+      const info = data.panelUpdateInfo || {};
+      const sub  = info.message ? `"${info.message.substring(0, 60)}${info.message.length > 60 ? '…' : ''}"` : 'A new version is available';
+      panelNotif.innerHTML = `
+        <div class="update-notification" onclick="selfUpdate()" title="Click to update StardropHost">
+          <div class="update-notification-icon">🔄</div>
+          <div class="update-notification-text">
+            <div class="update-notification-title">StardropHost update available</div>
+            <div class="update-notification-sub">${escapeHtml(sub)}</div>
+          </div>
+          <span style="color:var(--accent);font-size:18px;flex-shrink:0">›</span>
+        </div>`;
+      panelNotif.style.display = '';
+    } else {
+      panelNotif.style.display = 'none';
+    }
+  }
+
+  // Game update notification
+  const notif = document.getElementById('gameUpdateNotification');
+  if (notif) {
+    if (data.gameUpdateAvailable) {
+      const builds = data.gameUpdateBuilds || {};
+      const sub = builds.latest ? `Build ${builds.current || '?'} → ${builds.latest}` : 'A new version is available';
+      notif.innerHTML = `
+        <div class="update-notification" onclick="openGameUpdateModal()" title="Click to update">
+          <div class="update-notification-icon">⬆</div>
+          <div class="update-notification-text">
+            <div class="update-notification-title">Stardew Valley update available</div>
+            <div class="update-notification-sub">${escapeHtml(sub)} — click to update via Steam</div>
+          </div>
+          <span style="color:var(--accent);font-size:18px;flex-shrink:0">›</span>
+        </div>`;
+      notif.style.display = '';
+    } else {
+      notif.style.display = 'none';
+    }
+  }
+
 }
 
 // ─── Farm ────────────────────────────────────────────────────────
@@ -2629,4 +2671,168 @@ function startContainerReconnectPolling() {
     } catch {}
     if (Date.now() - startedAt > 120000) { clearInterval(containerReconnectPoll); window.location.reload(); }
   }, 2000);
+}
+
+// ─── Game Update ──────────────────────────────────────────────────
+
+let _guPollTimer = null;
+
+function openGameUpdateModal() {
+  // Reset to step 1
+  document.getElementById('guStep1').style.display = '';
+  document.getElementById('guStep2').style.display = 'none';
+  document.getElementById('guStep3').style.display = 'none';
+  document.getElementById('guUsername').value = '';
+  document.getElementById('guPassword').value = '';
+  if (document.getElementById('guGuardCode')) document.getElementById('guGuardCode').value = '';
+  document.getElementById('gameUpdateModal').style.display = '';
+}
+
+function closeGameUpdateModal() {
+  document.getElementById('gameUpdateModal').style.display = 'none';
+  if (_guPollTimer) { clearTimeout(_guPollTimer); _guPollTimer = null; }
+}
+
+async function gameUpdateStart() {
+  const username = document.getElementById('guUsername').value.trim();
+  const password = document.getElementById('guPassword').value;
+  if (!username || !password) { showToast('Enter your Steam username and password', 'error'); return; }
+
+  const btn = document.getElementById('guStartBtn');
+  btn.disabled = true;
+  btn.textContent = 'Connecting...';
+
+  document.getElementById('guStep1').style.display = 'none';
+  document.getElementById('guStep3').style.display = '';
+  document.getElementById('guStatus').textContent = 'Connecting to Steam...';
+  document.getElementById('guLog').textContent = '';
+  const doneBtn = document.getElementById('guDoneBtn');
+  const restartBtn = document.getElementById('guRestartBtn');
+  if (doneBtn)    doneBtn.style.display = 'none';
+  if (restartBtn) restartBtn.style.display = 'none';
+
+  await API.post('/api/game-update/start', { username, password });
+  btn.disabled = false;
+  btn.textContent = 'Update';
+  _guStartPolling();
+}
+
+async function gameUpdateGuard() {
+  const code = document.getElementById('guGuardCode').value.trim();
+  if (!code) { showToast('Enter the Steam Guard code', 'error'); return; }
+
+  const btn = document.getElementById('guGuardBtn');
+  btn.disabled = true;
+  btn.textContent = 'Submitting...';
+
+  const username = document.getElementById('guUsername').value.trim();
+  const password = document.getElementById('guPassword').value;
+
+  document.getElementById('guStep2').style.display = 'none';
+  document.getElementById('guStep3').style.display = '';
+  document.getElementById('guStatus').textContent = 'Resuming download...';
+
+  await API.post('/api/game-update/guard', { username, password, guardCode: code });
+  btn.disabled = false;
+  btn.textContent = 'Submit';
+  _guStartPolling();
+}
+
+async function gameUpdateRestart() {
+  const btn = document.getElementById('guRestartBtn');
+  if (btn) { btn.disabled = true; btn.textContent = 'Restarting...'; }
+  closeGameUpdateModal();
+  await API.post('/api/server/restart').catch(() => null);
+  showToast('Server restarting with updated game files...', 'success');
+  _pollServerState(true, 120000);
+}
+
+function _guStartPolling() {
+  if (_guPollTimer) clearTimeout(_guPollTimer);
+  _guPoll();
+}
+
+async function _guPoll() {
+  const data = await API.get('/api/game-update/status').catch(() => null);
+  if (!data) { _guPollTimer = setTimeout(_guPoll, 3000); return; }
+
+  const statusEl  = document.getElementById('guStatus');
+  const logEl     = document.getElementById('guLog');
+  const doneBtn   = document.getElementById('guDoneBtn');
+  const restartBtn = document.getElementById('guRestartBtn');
+
+  // Update log display (log is an array of lines)
+  if (logEl && data.log?.length) {
+    logEl.textContent = data.log.join('\n');
+    logEl.scrollTop = logEl.scrollHeight;
+  }
+
+  const state = data.update?.state;
+
+  if (state === 'guard_required') {
+    // Switch to step 2 for guard code
+    document.getElementById('guStep3').style.display = 'none';
+    document.getElementById('guStep2').style.display = '';
+    document.getElementById('guGuardCode').value = '';
+    document.getElementById('guGuardCode').focus();
+    return; // Stop polling — wait for user input
+  }
+
+  if (statusEl) {
+    statusEl.textContent =
+      state === 'downloading' ? 'Downloading game files...' :
+      state === 'done'        ? 'Download complete!' :
+      state === 'error'       ? `Error: ${data.update?.message || 'Unknown error'}` :
+                                'Working...';
+    statusEl.style.color = state === 'error' ? '#ef4444' : state === 'done' ? 'var(--accent)' : 'var(--accent)';
+  }
+
+  if (state === 'done') {
+    if (doneBtn)    doneBtn.style.display = '';
+    if (restartBtn) restartBtn.style.display = '';
+    // Clear the dashboard notification
+    const notif = document.getElementById('gameUpdateNotification');
+    if (notif) notif.style.display = 'none';
+    return; // Done — stop polling
+  }
+
+  if (state === 'error') {
+    if (doneBtn) doneBtn.style.display = '';
+    return; // Error — stop polling
+  }
+
+  // Keep polling while downloading
+  _guPollTimer = setTimeout(_guPoll, 3000);
+}
+
+// ─── Self Update (Update StardropHost button) ─────────────────────
+
+async function selfUpdate() {
+  const btn = document.getElementById('selfUpdateConfirmBtn');
+  if (btn) { btn.disabled = false; btn.textContent = 'Update Now'; }
+  document.getElementById('selfUpdateModal').style.display = '';
+}
+
+function closeSelfUpdateModal() {
+  document.getElementById('selfUpdateModal').style.display = 'none';
+}
+
+async function confirmSelfUpdate() {
+  const btn = document.getElementById('selfUpdateConfirmBtn');
+  btn.disabled = true;
+  btn.textContent = 'Updating...';
+
+  const data = await API.post('/api/server/update').catch(() => null);
+  if (data?.success || data?.action === 'update') {
+    closeSelfUpdateModal();
+    // Hide notification — update is underway
+    const notif = document.getElementById('panelUpdateNotification');
+    if (notif) notif.style.display = 'none';
+    showToast('Update started — the panel will restart shortly...', 'success');
+    setTimeout(startContainerReconnectPolling, 5000);
+  } else {
+    showToast(data?.error || 'Update failed', 'error');
+    btn.disabled = false;
+    btn.textContent = 'Update Now';
+  }
 }

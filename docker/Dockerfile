@@ -106,6 +106,8 @@ COPY --chown=steam:steam scripts/entrypoint.sh /home/steam/entrypoint.sh
 COPY --chown=steam:steam scripts/auto-backup.sh \
      scripts/crash-monitor.sh \
      scripts/event-handler.sh \
+     scripts/game-update-check.sh \
+     scripts/game-update.sh \
      scripts/health-check.sh \
      scripts/init-container.sh \
      scripts/log-manager.sh \
@@ -124,7 +126,10 @@ COPY --chown=steam:steam config/10-monitor.conf /etc/X11/xorg.conf.d/10-monitor.
 
 # -- Copy and install web panel --
 COPY --chown=steam:steam web-panel/ /home/steam/web-panel/
-RUN cd /home/steam/web-panel && npm ci --omit=dev
+RUN cd /home/steam/web-panel && npm ci --omit=dev && \
+    # Bake build timestamp so panel-update.js can compare against latest GitHub commit
+    date -u +%s > /home/steam/web-panel/build-timestamp.txt && \
+    chown steam:steam /home/steam/web-panel/build-timestamp.txt
 
 # -- Run as root to allow permission fixes on startup --
 USER root

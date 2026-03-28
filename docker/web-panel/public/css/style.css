@@ -474,8 +474,9 @@ body {
 }
 
 /* Console page — logs + terminal combined, fills viewport without page scroll.
-   100vh minus: sidebar header (~64px) + page-container padding (48px top+bottom) */
-.console-page { height: calc(100vh - 112px); display: flex; flex-direction: column; }
+   100vh minus: sidebar header (~64px) + page-container padding (48px top+bottom)
+   Must use .page.active.console-page to beat .page.active { display:block } specificity */
+.page.active.console-page { display: flex; flex-direction: column; height: calc(100vh - 112px); }
 
 .console-card {
   flex: 1;
@@ -610,6 +611,27 @@ body {
   line-height: 1.4;
   min-width: 80px;
 }
+
+/* ─── Game Update Notification ───────────────────────────────── */
+
+.update-notification {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 16px;
+  background: rgba(167, 139, 250, 0.08);
+  border: 1px solid rgba(167, 139, 250, 0.3);
+  border-radius: 10px;
+  margin-bottom: 16px;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+.update-notification:hover { background: rgba(167, 139, 250, 0.14); }
+.update-notification-icon { font-size: 20px; flex-shrink: 0; }
+.update-notification-text { flex: 1; }
+.update-notification-title { font-weight: 600; font-size: 14px; color: var(--accent); }
+.update-notification-sub   { font-size: 12px; color: var(--text-secondary); margin-top: 2px; }
 
 /* ─── Saves ───────────────────────────────────────────────────── */
 

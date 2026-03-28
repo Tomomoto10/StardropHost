@@ -121,6 +121,18 @@ const farmAPI = require('./api/farm');
 app.get('/api/farm/overview',        auth.verifyMiddleware, farmAPI.getFarmOverview);
 app.get('/api/farm/live',            auth.verifyMiddleware, farmAPI.getLiveStatus);
 
+// -- Game update --
+const gameUpdateAPI = require('./api/game-update');
+app.get( '/api/game-update/status', auth.verifyMiddleware, gameUpdateAPI.getStatus);
+app.post('/api/game-update/check',  auth.verifyMiddleware, gameUpdateAPI.checkNow);
+app.post('/api/game-update/start',  auth.verifyMiddleware, gameUpdateAPI.startUpdate);
+app.post('/api/game-update/guard',  auth.verifyMiddleware, gameUpdateAPI.submitGuard);
+
+// -- Panel update --
+const panelUpdateAPI = require('./api/panel-update');
+app.get( '/api/panel-update/status', auth.verifyMiddleware, panelUpdateAPI.getStatus);
+app.post('/api/panel-update/check',  auth.verifyMiddleware, panelUpdateAPI.checkNow);
+
 // -- Steam (auth via steam-auth container for game download only) --
 const steamAPI = require('./api/steam');
 app.get( '/api/steam/status',     auth.verifyMiddleware, steamAPI.getStatus);
@@ -233,6 +245,8 @@ async function start() {
   server.listen(PORT, '0.0.0.0', () => {
     console.log(`[StardropHost] ✅ Web panel running on http://0.0.0.0:${PORT}`);
   });
+
+  panelUpdateAPI.startBackgroundCheck();
 }
 
 start().catch((err) => {

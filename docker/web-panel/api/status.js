@@ -300,6 +300,38 @@ function collectStatus(req = null) {
   // containerUptime resets on every container restart — reliable for boot-state detection
   status.containerUptime = Math.floor((Date.now() - PANEL_START_TIME) / 1000);
 
+  // -- Game update availability (written by game-update-check.sh daily) --
+  try {
+    const checkFile = require('path').join(config.DATA_DIR, 'game-update-available.json');
+    if (fs.existsSync(checkFile)) {
+      const check = JSON.parse(fs.readFileSync(checkFile, 'utf-8'));
+      status.gameUpdateAvailable = check.available === true;
+      if (check.available) {
+        status.gameUpdateBuilds = { current: check.currentBuild, latest: check.latestBuild };
+      }
+    } else {
+      status.gameUpdateAvailable = false;
+    }
+  } catch {
+    status.gameUpdateAvailable = false;
+  }
+
+  // -- Panel update availability (written by panel-update.js background check) --
+  try {
+    const checkFile = require('path').join(config.DATA_DIR, 'panel-update-available.json');
+    if (fs.existsSync(checkFile)) {
+      const check = JSON.parse(fs.readFileSync(checkFile, 'utf-8'));
+      status.panelUpdateAvailable = check.available === true;
+      if (check.available) {
+        status.panelUpdateInfo = { sha: check.latestCommitSha, message: check.latestMessage };
+      }
+    } else {
+      status.panelUpdateAvailable = false;
+    }
+  } catch {
+    status.panelUpdateAvailable = false;
+  }
+
   cachedStatus = status;
   cacheTime = now;
 

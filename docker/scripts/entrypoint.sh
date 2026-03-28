@@ -665,6 +665,10 @@ cd /home/steam/stardewvalley
 log_info "Starting event handler..."
 /home/steam/scripts/event-handler.sh &
 
+# Start daily game update checker (runs in background, checks once per day)
+log_info "Starting game update checker..."
+/home/steam/scripts/game-update-check.sh &
+
 # New farm config — StardropHost.Dependencies SMAPI mod handles creation automatically.
 # The mod reads new-farm.json once the title screen appears and creates
 # the farm using Stardew's own C# API.
