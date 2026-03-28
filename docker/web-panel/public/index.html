@@ -257,6 +257,10 @@
           <span class="nav-icon"><svg class="icon"><use href="#icon-config"></use></svg></span>
           <span class="nav-label">Config</span>
         </li>
+        <li class="nav-item" data-page="remote">
+          <span class="nav-icon"><svg class="icon"><use href="#icon-globe"></use></svg></span>
+          <span class="nav-label">Remote</span>
+        </li>
       </ul>
       <div id="sidebarVersion" style="text-align:center;font-size:11px;color:var(--text-muted);padding:4px 0 0;opacity:0.6"></div>
       <div class="sidebar-footer">
@@ -281,6 +285,7 @@
       <button class="mob-nav-item" type="button" data-page="mods"><svg class="icon"><use href="#icon-mods"></use></svg></button>
       <button class="mob-nav-item" type="button" data-page="terminal"><svg class="icon"><use href="#icon-terminal"></use></svg></button>
       <button class="mob-nav-item" type="button" data-page="config"><svg class="icon"><use href="#icon-config"></use></svg></button>
+      <button class="mob-nav-item" type="button" data-page="remote"><svg class="icon"><use href="#icon-globe"></use></svg></button>
     </nav>
 
     <!-- Main content -->
@@ -576,6 +581,56 @@
               <button class="btn" style="color:#ef4444;border-color:#ef4444;white-space:nowrap;flex-shrink:0"
                 type="button" onclick="openFactoryResetModal()">Delete Farm &amp; Restart Setup</button>
             </div>
+          </div>
+
+        </section>
+
+        <!-- ── Remote ──────────────────────────────────────────── -->
+        <section id="page-remote" class="page">
+
+          <!-- About card -->
+          <div class="card" style="margin-bottom:16px">
+            <h3>Remote Play via playit.gg</h3>
+            <p style="color:var(--text-secondary);margin:8px 0 12px">
+              playit.gg creates a free internet tunnel so your friends can join without port forwarding or a VPN.
+              Once connected, they join using the invite address shown on your
+              <a href="https://playit.gg" target="_blank" rel="noopener noreferrer" style="color:var(--accent)">playit.gg dashboard</a>.
+            </p>
+            <div style="font-size:13px;color:var(--text-secondary);line-height:1.7">
+              <strong>How to get started:</strong>
+              <ol style="margin:6px 0 0 18px;padding:0">
+                <li>Sign up at <a href="https://playit.gg" target="_blank" rel="noopener noreferrer" style="color:var(--accent)">playit.gg</a></li>
+                <li>Create a UDP tunnel on port <strong>24642</strong></li>
+                <li>Copy your <strong>Secret Key</strong> from the tunnel agent page</li>
+                <li>Paste it below and click <strong>Activate</strong></li>
+                <li>Share the tunnel address from your playit.gg dashboard with your friends</li>
+              </ol>
+            </div>
+            <p style="font-size:12px;color:var(--text-muted);margin:12px 0 0">
+              The secret key is held in memory only — it is never saved to disk and will need to be re-entered if the panel container restarts.
+              To update your key, enter the new value and click Activate.
+            </p>
+          </div>
+
+          <!-- Secret key card -->
+          <div class="card">
+            <h3>Tunnel Secret Key</h3>
+            <div id="remoteStatus" style="margin-bottom:14px">
+              <div class="empty-state">Loading...</div>
+            </div>
+            <div class="form-row" style="align-items:flex-start;gap:8px;flex-wrap:wrap">
+              <div style="position:relative;flex:1;min-width:200px">
+                <input type="password" id="playitKeyInput" class="input" placeholder="Paste secret key from playit.gg"
+                  style="width:100%;padding-right:40px">
+                <button type="button" id="playitKeyToggle" title="Show / hide key"
+                  style="position:absolute;right:8px;top:50%;transform:translateY(-50%);background:none;border:none;cursor:pointer;color:var(--text-muted);padding:0;line-height:1">
+                  <svg class="icon" style="width:18px;height:18px"><use href="#icon-eye"></use></svg>
+                </button>
+              </div>
+              <button class="btn btn-primary" type="button" id="playitActivateBtn" onclick="activatePlayit()">Activate</button>
+              <button class="btn" type="button" id="playitClearBtn" onclick="clearPlayit()" style="display:none">Stop Tunnel</button>
+            </div>
+            <div id="playitMsg" style="margin-top:10px;font-size:13px;display:none"></div>
           </div>
 
         </section>

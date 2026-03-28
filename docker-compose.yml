@@ -90,18 +90,6 @@ services:
           cpus: '${CPU_LIMIT:-0}'
           memory: '${MEMORY_LIMIT:-0}'
 
-  # --- playit.gg ---
-  # Tunnel agent for playit.gg — allows players to connect online without
-  # port forwarding. Get a secret key at https://playit.gg and set
-  # PLAYIT_SECRET_KEY in your .env file.
-  # Remove or comment this service out if you don't use playit.gg.
-  stardrop-playit:
-    image: ghcr.io/playit-cloud/playit-agent:0.17
-    container_name: ${CONTAINER_PREFIX:-stardrop}-playit
-    network_mode: host
-    restart: unless-stopped
-    command: ["${PLAYIT_SECRET_KEY}"]
-
   # --- Steam Auth ---
   # Handles Steam login + 2FA for game download via the wizard.
   # Credentials are memory-only — never stored to disk.

@@ -1253,6 +1253,7 @@ function init() {
   loadBackupStatus();
   renderQuickActions();
   loadPanelVersion();
+  setupPlayitKeyToggle();
 
   document.getElementById('logoutBtn').onclick = () => {
     localStorage.removeItem('panel_token');
@@ -1302,7 +1303,7 @@ function init() {
   statusInterval = setInterval(loadDashboard, 5000);
 
   // Restore page from URL hash on refresh
-  const VALID_PAGES = ['dashboard','farm','players','saves','mods','terminal','config'];
+  const VALID_PAGES = ['dashboard','farm','players','saves','mods','terminal','config','remote'];
   const hashPage = window.location.hash.slice(1);
   if (hashPage && VALID_PAGES.includes(hashPage)) navigateTo(hashPage);
 }
@@ -1310,7 +1311,7 @@ function init() {
 // ─── Navigation ──────────────────────────────────────────────────
 const PAGE_TITLES = {
   dashboard: 'Dashboard', farm: 'Farm', players: 'Players',
-  saves: 'Saves', mods: 'Mods', terminal: 'Console', config: 'Config',
+  saves: 'Saves', mods: 'Mods', terminal: 'Console', config: 'Config', remote: 'Remote',
 };
 
 function setupNavigation() {
@@ -1353,6 +1354,7 @@ function navigateTo(page) {
     case 'mods':      loadMods();                                            break;
     case 'terminal':  loadLogs('game'); subscribeToLogs('game');             break;
     case 'config':    loadConfig(); loadVnc(); loadServerModeCard();         break;
+    case 'remote':    loadRemoteStatus();                                    break;
   }
 }
 
@@ -2946,4 +2948,112 @@ async function checkAllUpdates() {
 
   if (btn) { btn.disabled = false; btn.textContent = 'Check for Updates'; }
   showToast('Update check complete', 'success');
+}
+
+// ─── Remote (playit.gg) ──────────────────────────────────────────
+
+async function loadRemoteStatus() {
+  const statusEl = document.getElementById('remoteStatus');
+  const clearBtn = document.getElementById('playitClearBtn');
+  if (!statusEl) return;
+
+  try {
+    const data = await API.get('/api/remote/status');
+
+    const running = data.running === true;
+    const hasKey  = data.hasKey === true;
+
+    let html = '';
+    if (running) {
+      html = `<div style="display:flex;align-items:center;gap:8px">
+        <span class="status-dot online"></span>
+        <span style="color:var(--text-primary);font-weight:500">Tunnel active</span>
+        <span style="color:var(--text-secondary);font-size:13px">— Your friends can connect via your playit.gg address</span>
+      </div>`;
+    } else if (hasKey) {
+      html = `<div style="display:flex;align-items:center;gap:8px">
+        <span class="status-dot" style="background:var(--accent)"></span>
+        <span style="color:var(--text-secondary)">Key set — tunnel container starting or reconnecting</span>
+      </div>`;
+    } else {
+      html = `<div style="color:var(--text-muted);font-size:13px">No key set — tunnel is not running.</div>`;
+    }
+    statusEl.innerHTML = html;
+
+    if (clearBtn) clearBtn.style.display = hasKey ? '' : 'none';
+  } catch {
+    statusEl.innerHTML = '<div style="color:var(--text-muted);font-size:13px">Could not load status.</div>';
+  }
+}
+
+async function activatePlayit() {
+  const input   = document.getElementById('playitKeyInput');
+  const btn     = document.getElementById('playitActivateBtn');
+  const msgEl   = document.getElementById('playitMsg');
+  const key     = input?.value?.trim();
+
+  if (!key) {
+    showPlayitMsg('Please enter your playit.gg secret key.', 'error');
+    return;
+  }
+
+  btn.disabled = true;
+  btn.textContent = 'Activating...';
+  hidePlayitMsg();
+
+  try {
+    await API.post('/api/remote/key', { secretKey: key });
+    input.value = '';
+    showPlayitMsg('Tunnel activated. The playit container is restarting with your key.', 'success');
+    await loadRemoteStatus();
+  } catch (e) {
+    showPlayitMsg(e.message || 'Failed to activate tunnel.', 'error');
+  } finally {
+    btn.disabled = false;
+    btn.textContent = 'Activate';
+  }
+}
+
+async function clearPlayit() {
+  const btn   = document.getElementById('playitClearBtn');
+  const msgEl = document.getElementById('playitMsg');
+
+  btn.disabled = true;
+  btn.textContent = 'Stopping...';
+  hidePlayitMsg();
+
+  try {
+    await API.post('/api/remote/clear');
+    showPlayitMsg('Tunnel stopped and key cleared.', 'success');
+    await loadRemoteStatus();
+  } catch (e) {
+    showPlayitMsg(e.message || 'Failed to stop tunnel.', 'error');
+  } finally {
+    btn.disabled = false;
+    btn.textContent = 'Stop Tunnel';
+  }
+}
+
+function showPlayitMsg(text, type) {
+  const el = document.getElementById('playitMsg');
+  if (!el) return;
+  el.textContent = text;
+  el.style.color  = type === 'error' ? '#ef4444' : 'var(--accent)';
+  el.style.display = '';
+}
+
+function hidePlayitMsg() {
+  const el = document.getElementById('playitMsg');
+  if (el) el.style.display = 'none';
+}
+
+function setupPlayitKeyToggle() {
+  const toggle = document.getElementById('playitKeyToggle');
+  const input  = document.getElementById('playitKeyInput');
+  if (!toggle || !input) return;
+  toggle.addEventListener('click', () => {
+    const isPassword = input.type === 'password';
+    input.type = isPassword ? 'text' : 'password';
+    toggle.querySelector('use').setAttribute('href', isPassword ? '#icon-eye-off' : '#icon-eye');
+  });
 }

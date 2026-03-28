@@ -24,6 +24,14 @@ const SERVICE_CONTAINERS = {
   'stardrop-server': 'stardrop',
 };
 
+const PLAYIT_IMAGE = 'ghcr.io/playit-cloud/playit-agent:0.17';
+
+function getPlayitContainerName() {
+  const env = { ...parseEnvFile(DEFAULT_ENV_FILE), ...parseEnvFile(RUNTIME_ENV_FILE) };
+  const prefix = process.env.CONTAINER_PREFIX || env.CONTAINER_PREFIX || 'stardrop';
+  return `${prefix}-playit`;
+}
+
 // -- Helpers --
 
 function sendJson(res, statusCode, data) {
@@ -123,6 +131,57 @@ function startService(service) {
   child.unref();
 }
 
+function startPlayit(secretKey) {
+  // Remove any existing playit container, then start a fresh one with the key as the CLI arg.
+  // The key is passed as a positional argument — never stored to disk.
+  const name = getPlayitContainerName();
+  const command = [
+    `docker rm -f ${name} >/dev/null 2>&1 || true`,
+    `docker run -d --name ${name} --network host --restart unless-stopped ${PLAYIT_IMAGE} "${secretKey}"`,
+  ].join(' && ');
+
+  const child = spawn('sh', ['-lc', command], {
+    cwd: PROJECT_DIR,
+    env: buildComposeEnv(),
+    detached: true,
+    stdio: 'ignore',
+  });
+  child.unref();
+}
+
+function stopPlayit() {
+  const name = getPlayitContainerName();
+  const command = `docker rm -f ${name} >/dev/null 2>&1 || true`;
+
+  const child = spawn('sh', ['-lc', command], {
+    cwd: PROJECT_DIR,
+    env: buildComposeEnv(),
+    detached: true,
+    stdio: 'ignore',
+  });
+  child.unref();
+}
+
+function getPlayitStatus() {
+  const name = getPlayitContainerName();
+  return new Promise((resolve) => {
+    const child = spawn('docker', ['inspect', '--format', '{{.State.Status}}', name], {
+      cwd: PROJECT_DIR,
+      env: buildComposeEnv(),
+    });
+    let out = '';
+    child.stdout.on('data', d => { out += d; });
+    child.on('close', (code) => {
+      const status = out.trim();
+      resolve({
+        running: code === 0 && status === 'running',
+        containerStatus: code === 0 ? status : 'not found',
+      });
+    });
+    child.on('error', () => resolve({ running: false, containerStatus: 'error' }));
+  });
+}
+
 function updateServer() {
   const env = buildComposeEnv();
 
@@ -216,6 +275,45 @@ const server = http.createServer(async (req, res) => {
       sendJson(res, 202, { success: true, action: 'update' });
     } catch (error) {
       sendJson(res, 500, { error: error.message || 'Failed to schedule update' });
+    }
+    return;
+  }
+
+  // Playit status
+  if (req.method === 'GET' && req.url === '/playit/status') {
+    try {
+      const status = await getPlayitStatus();
+      sendJson(res, 200, status);
+    } catch (error) {
+      sendJson(res, 500, { error: error.message || 'Failed to get playit status' });
+    }
+    return;
+  }
+
+  // Playit start (accepts secretKey in body)
+  if (req.method === 'POST' && req.url === '/playit/start') {
+    try {
+      const body = await readJson(req);
+      const secretKey = body?.secretKey ? String(body.secretKey).trim() : '';
+      if (!secretKey) {
+        sendJson(res, 400, { error: 'secretKey is required' });
+        return;
+      }
+      startPlayit(secretKey);
+      sendJson(res, 202, { success: true, action: 'playit-start' });
+    } catch (error) {
+      sendJson(res, 500, { error: error.message || 'Failed to start playit' });
+    }
+    return;
+  }
+
+  // Playit stop
+  if (req.method === 'POST' && req.url === '/playit/stop') {
+    try {
+      stopPlayit();
+      sendJson(res, 202, { success: true, action: 'playit-stop' });
+    } catch (error) {
+      sendJson(res, 500, { error: error.message || 'Failed to stop playit' });
     }
     return;
   }
