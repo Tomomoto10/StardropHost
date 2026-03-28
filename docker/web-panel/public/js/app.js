@@ -599,8 +599,8 @@ async function wizSubmitSteamcmdGuard() {
     return;
   }
 
-  if (btn) btn.disabled = true;
-  if (statusEl) statusEl.textContent = 'Submitting…';
+  if (btn) { btn.disabled = true; btn.textContent = 'Submitting…'; }
+  if (statusEl) statusEl.textContent = '';
 
   try {
     const data = await API.post('/api/wizard/step/2', {
@@ -676,8 +676,9 @@ async function wizPollDownloadProgress() {
         const guardRow  = document.getElementById('wiz-dl-guard-row');
         const guardBtn  = document.getElementById('wiz-dl-guard-btn');
         const guardStat = document.getElementById('wiz-dl-guard-status');
+        const alreadyShown = guardRow && guardRow.style.display !== 'none';
         if (guardRow) guardRow.style.display = '';
-        if (guardBtn) guardBtn.disabled = false;
+        if (guardBtn) { guardBtn.disabled = false; guardBtn.textContent = alreadyShown ? 'Submit & Retry' : 'Submit'; }
         if (guardStat) guardStat.textContent = '';
         if (lbl) { lbl.style.color = 'var(--accent-warning,#f59e0b)'; lbl.textContent = '⏳ Waiting for Steam Guard code…'; }
         if (bar) bar.style.width = '30%';
@@ -2676,9 +2677,11 @@ function startContainerReconnectPolling() {
 // ─── Game Update ──────────────────────────────────────────────────
 
 let _guPollTimer = null;
+let _guGuardAttempted = false;
 
 function openGameUpdateModal() {
   // Reset to step 1
+  _guGuardAttempted = false;
   document.getElementById('guStep1').style.display = '';
   document.getElementById('guStep2').style.display = 'none';
   document.getElementById('guStep3').style.display = 'none';
@@ -2728,6 +2731,7 @@ async function gameUpdateGuard() {
   const username = document.getElementById('guUsername').value.trim();
   const password = document.getElementById('guPassword').value;
 
+  _guGuardAttempted = true;
   document.getElementById('guStep2').style.display = 'none';
   document.getElementById('guStep3').style.display = '';
   document.getElementById('guStatus').textContent = 'Resuming download...';
@@ -2773,6 +2777,8 @@ async function _guPoll() {
     // Switch to step 2 for guard code
     document.getElementById('guStep3').style.display = 'none';
     document.getElementById('guStep2').style.display = '';
+    const guardBtn = document.getElementById('guGuardBtn');
+    if (guardBtn) guardBtn.textContent = _guGuardAttempted ? 'Submit & Retry' : 'Submit';
     document.getElementById('guGuardCode').value = '';
     document.getElementById('guGuardCode').focus();
     return; // Stop polling — wait for user input
