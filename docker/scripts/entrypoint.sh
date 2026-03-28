@@ -86,14 +86,6 @@ configure_headless_mode() {
     export SDL_VIDEODRIVER=${SDL_VIDEODRIVER:-x11}
     export SDL_AUDIODRIVER=${SDL_AUDIODRIVER:-dummy}
     export MONO_GC_PARAMS=${MONO_GC_PARAMS:-nursery-size=8m}
-
-    XVFB_FB_DIR=${XVFB_FB_DIR:-/dev/shm/xvfb}
-    if mkdir -p "$XVFB_FB_DIR" 2>/dev/null; then
-        XVFB_FB_ARGS=(-fbdir "$XVFB_FB_DIR")
-    else
-        XVFB_FB_DIR=""
-        XVFB_FB_ARGS=()
-    fi
 }
 
 # -- Startup preferences tuning (always applied — headless server has no use for sound/high-res) --
