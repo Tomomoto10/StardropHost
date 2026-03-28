@@ -65,16 +65,11 @@ except Exception:
 
     local latest_build=""
 
-    # Try curl first
-    if command -v curl &>/dev/null; then
-        latest_build=$(curl -sSL --max-time 15 \
-            "https://api.steamcmd.net/v1/info/413150" 2>/dev/null \
-            | grep -oE '"buildid"[[:space:]]*:[[:space:]]*"[0-9]+"' \
-            | grep -oE '[0-9]+' | head -1 || true)
-    fi
-
-    # Python3 fallback
-    if [ -z "$latest_build" ] && command -v python3 &>/dev/null; then
+    # Use Python3 to parse the Steam API response properly.
+    # The JSON contains multiple "buildid" fields (one per depot + one per branch).
+    # Grepping for the first match returns a depot-level ID, not the public branch ID.
+    # We must navigate the full JSON path to get the correct value.
+    if command -v python3 &>/dev/null; then
         latest_build=$(python3 - 2>/dev/null <<'EOF'
 import urllib.request, json, sys
 try:
