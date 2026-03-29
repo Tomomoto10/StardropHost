@@ -591,16 +591,13 @@
           <!-- Header card -->
           <div class="card" style="margin-bottom:16px">
             <h3>Remote Access — Friend Connect</h3>
-            <p style="color:var(--text-secondary);margin:8px 0 10px;line-height:1.65;font-size:14px">
-              Host your Stardew server behind a firewall or NAT? Use a tunnel service to give friends a
-              public address to connect — no port forwarding or VPN required. Your StardropHost dashboard
-              can also be accessed remotely using the same tunnel.
-            </p>
-            <div style="font-size:13px;color:var(--text-muted);line-height:1.6">
-              Friends join using a domain name or IP provided by the tunnel service — not in-game invite codes.
-              Premium services like playit.gg support multiple tunnels, making it easy to host several game
-              instances on the same VM.
-            </div>
+            <ul style="font-size:13px;color:var(--text-secondary);line-height:1.8;margin:10px 0 0 18px;padding:0">
+              <li>Used to access your Stardew game or StardropHost dashboard remotely</li>
+              <li>Invite friends with a co-op IP or domain name — not in-game invite codes</li>
+              <li>Host multiple game instances on one VM easily (depends on the service used)</li>
+              <li>Recommended: use playit.gg — tested and working. See the setup guide below.</li>
+              <li>Other services should work by following their own setup guides</li>
+            </ul>
           </div>
 
           <!-- playit.gg guide (collapsible) -->
@@ -608,17 +605,19 @@
             <summary>
               <span style="font-weight:600;font-size:15px">playit.gg</span>
               <span class="remote-badge">RECOMMENDED</span>
-              <span style="color:var(--text-muted);font-size:13px;margin-left:8px">Free / Paid tunnel — no client setup needed</span>
+              <span style="color:var(--text-muted);font-size:13px;margin-left:8px">Paid / Free — No client setup needed</span>
             </summary>
 
-            <div style="margin-top:16px;font-size:13px;color:var(--text-secondary);line-height:1.6;border-top:1px solid var(--border);padding-top:14px">
-              <p style="margin:0 0 8px">
-                playit.gg creates a public tunnel to your server with no client-side install needed for your friends.
-                Works on PC and Mobile (UDP). Console support requires TCP (Premium).
-              </p>
-              <ul style="margin:0 0 10px 18px;padding:0">
-                <li><strong>Free tier</strong> — UDP only, PC &amp; Mobile</li>
-                <li><strong>Premium (~$5/mo)</strong> — TCP + UDP, custom domains, multiple tunnels — highly recommended</li>
+            <div style="margin-top:14px;border-top:1px solid var(--border);padding-top:14px;font-size:13px;color:var(--text-secondary);line-height:1.75">
+              <ul style="margin:0 0 6px 18px;padding:0">
+                <li>No client setup needed</li>
+                <li>Multiplatform — PC, Mobile, Console* <em style="color:var(--text-muted)">(Console untested)</em></li>
+              </ul>
+              <p style="margin:8px 0 4px">Premium is <strong>highly recommended</strong>. Free tier works but has no TCP — StardropHost/Stardew works on UDP (PC &amp; Mobile only). Consoles require TCP/UDP.</p>
+              <ul style="margin:0 0 4px 18px;padding:0">
+                <li>Paid is only ~$5/mo — worth it for custom domain names</li>
+                <li>Agents + Tunnels are essential for multi-instance Stardew / StardropHost installs</li>
+                <li>Supports firewall and proxy setup for safe, monitorable connections</li>
               </ul>
             </div>
 
@@ -626,9 +625,9 @@
             <details class="remote-sub">
               <summary>Account Setup</summary>
               <ol class="remote-steps">
-                <li>Sign up at <a href="https://playit.gg" target="_blank" rel="noopener noreferrer">playit.gg</a></li>
-                <li>Do <strong>not</strong> set up an agent yet — press <strong>"Exit Wizard"</strong> if prompted</li>
-                <li>Purchase a Premium subscription (recommended — banner at top of dashboard)</li>
+                <li>Sign up for an account at <a href="https://playit.gg" target="_blank" rel="noopener noreferrer">playit.gg</a></li>
+                <li>Don't set up an agent yet — press <strong>"Exit Wizard"</strong></li>
+                <li>Purchase a Premium subscription (~$5/mo) — activation banner appears at the top</li>
                 <li>Go to <strong>Setup</strong> in the top bar → click <strong>"New Account Wizard"</strong></li>
                 <li>Select <strong>Docker</strong> when asked where to integrate playit</li>
               </ol>
@@ -639,12 +638,11 @@
               <summary>Agent Setup</summary>
               <ol class="remote-steps">
                 <li>Name your agent (e.g. <code>StardropHost-1</code>) then press <strong>Next</strong></li>
-                <li>A <code>docker run</code> command will be shown — <strong>copy only the 64-character secret key</strong>:<br>
-                  <code style="display:block;margin:6px 0;padding:6px 10px;background:var(--bg-primary);border-radius:4px;word-break:break-all">
-                    docker run --rm -it --net=host -e SECRET_KEY=<strong style="color:var(--accent)">YOUR_SECRET_KEY_HERE</strong>
-                  </code>
+                <li>A Docker Run command will be shown — <strong>copy only the 64-character SECRET_KEY</strong>, not the whole command:<br>
+                  <code style="display:block;margin:6px 0;padding:8px 10px;background:var(--bg-primary);border-radius:4px;font-size:11px;word-break:break-all;line-height:1.6">docker run --rm -it --net=host -e SECRET_KEY=<strong style="color:var(--accent)">&#x25BA;&#x25BA;&#x25BA; COPY THIS KEY ONLY &#x25C4;&#x25C4;&#x25C4;</strong></code>
                 </li>
-                <li>After loading, the agent will show <strong>Connected</strong> in the playit.gg Agents tab</li>
+                <li>Enter the key in the Compose entry below (see Docker Compose Example card) and click <strong>Apply &amp; Connect</strong></li>
+                <li>After connecting, the agent will show <strong>Connected</strong> in the playit.gg Agents tab</li>
               </ol>
             </details>
 
@@ -652,37 +650,36 @@
             <details class="remote-sub">
               <summary>Tunnel Setup</summary>
               <ol class="remote-steps">
-                <li>Go to the <strong>Tunnels</strong> tab on playit.gg → click <strong>Create Tunnel</strong></li>
-                <li>Name it (e.g. <code>Stardrop-Share</code>), select type <strong>UDP</strong>, port count <strong>1</strong></li>
-                <li>Add a description (e.g. <em>Stardew Valley</em>) then complete the usage confirmation</li>
-                <li>For <strong>Local IP &amp; Port</strong>: copy your server's local IP from the StardropHost dashboard
-                  and use port <strong>24642</strong> for game, or your panel port (default <strong>18642</strong>) to share remote dashboard access</li>
-                <li>Select the agent you created in the previous step, then click <strong>Create Tunnel</strong></li>
-                <li>Your tunnel domain (e.g. <code>name.playit.plus</code>) and IP will now appear in the Tunnels tab —
-                  share this address with friends to connect from anywhere</li>
+                <li>Click the <strong>Tunnels</strong> tab on playit.gg → create a tunnel</li>
+                <li>Name it (e.g. <code>Stardrop-Share</code>), select type <strong>UDP</strong>, port count <strong>1</strong><br>
+                  <em style="color:var(--text-muted);font-size:12px">Additional ports can be used for multi-instances or remote dashboard access</em></li>
+                <li>Give it a description (e.g. <em>Stardew Valley</em>), then complete the usage confirmation</li>
+                <li>For <strong>Public End Point</strong> — select the region closest to you</li>
+                <li>Copy your <strong>Local IP and Port</strong> from the StardropHost dashboard (e.g. <code>172.XX.X.X</code>, port <code>24642</code>)<br>
+                  <em style="color:var(--text-muted);font-size:12px">Use your panel port number (default 18642) to also share remote dashboard access</em></li>
+                <li>For <strong>Proxy Protocol</strong> — see <a href="https://playit.gg/support/what-is-proxy-protocol/" target="_blank" rel="noopener noreferrer">playit.gg/support/what-is-proxy-protocol</a></li>
+                <li>Press <strong>Next</strong>, select the agent created above, then click <strong>Create Tunnel</strong></li>
+                <li>In the Tunnels tab your tunnel will show a <code>domain.name.playit.plus</code> address and an <code>XX.X.XXX.XX:XXXX</code> IP — share either with friends to connect from anywhere</li>
               </ol>
             </details>
 
-            <!-- Compose example -->
-            <details class="remote-sub">
-              <summary>Docker Compose Example</summary>
-              <p style="font-size:13px;color:var(--text-secondary);margin:10px 0 8px">
-                Replace <code>YOUR_SECRET_KEY</code> with the key from your agent setup above, then paste into the
-                <strong>Remote Service</strong> box below.
-              </p>
-              <pre id="playitComposeExample" style="background:var(--bg-primary);border:1px solid var(--border);border-radius:6px;padding:12px;font-size:12px;overflow-x:auto;margin:0 0 10px;line-height:1.6">services:
+          </details>
+
+          <!-- Docker Compose example card -->
+          <div class="card" style="margin-bottom:16px">
+            <h3>Docker Compose Example — playit.gg</h3>
+            <p style="font-size:13px;color:var(--text-secondary);margin:8px 0 12px;line-height:1.6">
+              Replace <code>YOUR_SECRET_KEY</code> with the key from your Agent Setup above, then copy and paste
+              the full snippet into the <strong>Remote Service</strong> entry below.
+            </p>
+            <pre style="background:var(--bg-primary);border:1px solid var(--border);border-radius:6px;padding:12px;font-size:12px;overflow-x:auto;margin:0;line-height:1.6">services:
   playit:
     image: ghcr.io/playit-cloud/playit-agent:0.17
     network_mode: host
     restart: unless-stopped
     environment:
       - SECRET_KEY=YOUR_SECRET_KEY</pre>
-              <button class="btn btn-primary" type="button" onclick="useComposeExample('playitComposeExample')">
-                Use This Example
-              </button>
-            </details>
-
-          </details>
+          </div>
 
           <!-- Compose configuration card -->
           <div class="card" style="margin-bottom:16px">
@@ -732,34 +729,30 @@
           <!-- Other services (collapsible) -->
           <details class="card remote-guide">
             <summary>
-              <span style="font-weight:600;font-size:15px">Other Tunnel Services</span>
+              <span style="font-weight:600;font-size:15px">Other Options</span>
             </summary>
 
-            <div style="margin-top:14px;border-top:1px solid var(--border);padding-top:14px;font-size:13px;color:var(--text-secondary);line-height:1.7">
-              <p style="margin:0 0 6px">
-                Any service that provides a <strong>Docker Compose example</strong> can be used — paste it in the box above.
-                Services without a compose example require manual setup on your VM (e.g. via SSH on Proxmox) and
-                won't be managed by StardropHost.
+            <div style="margin-top:14px;border-top:1px solid var(--border);padding-top:14px;font-size:13px;color:var(--text-secondary);line-height:1.75">
+              <p style="margin:0 0 10px">
+                If your preferred service has a Docker Compose example, enter it in the Compose Entry above.
+                If it does not, you will need to manually set up the service on your StardropHost VM (e.g. via SSH on Proxmox).
+                <em style="color:var(--text-muted)">Manual installs will not be updated when updating StardropHost.</em>
               </p>
 
-              <div style="margin-top:14px">
-                <strong style="color:var(--text-primary);display:block;margin-bottom:6px">No client setup needed (friends connect directly):</strong>
-                <ul style="margin:0 0 14px 18px;padding:0">
-                  <li><strong>Ngrok</strong> — tunnel service, free tier available</li>
-                  <li><strong>Portmap.io</strong> — simple UDP/TCP port mapping</li>
-                </ul>
-              </div>
+              <strong style="color:var(--text-primary);display:block;margin-bottom:6px">No client setup needed — similar to playit.gg, known to work for gaming:</strong>
+              <ul style="margin:0 0 14px 18px;padding:0">
+                <li>Ngrok</li>
+                <li>Portmap.io</li>
+              </ul>
 
-              <div>
-                <strong style="color:var(--text-primary);display:block;margin-bottom:6px">Client setup needed (friends install an app):</strong>
-                <ul style="margin:0 0 4px 18px;padding:0">
-                  <li><strong>ZeroTier</strong> — virtual LAN, friends need ZeroTier client and your network ID</li>
-                  <li><strong>Tailscale</strong> — mesh VPN, friends need Tailscale and an invite</li>
-                </ul>
-                <p style="margin:8px 0 0;color:var(--text-muted);font-size:12px">
-                  Other VPS, VPN, and port-forwarding services should work but are untested.
-                </p>
-              </div>
+              <strong style="color:var(--text-primary);display:block;margin-bottom:6px">Client setup needed — requires friends to install an app:</strong>
+              <ul style="margin:0 0 10px 18px;padding:0">
+                <li>ZeroTier</li>
+                <li>Tailscale</li>
+              </ul>
+              <p style="margin:0;color:var(--text-muted);font-size:12px">
+                Other VPS, VPN, port forwarding and other services should work but are untested.
+              </p>
             </div>
           </details>
 

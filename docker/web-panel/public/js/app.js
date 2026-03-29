@@ -3090,22 +3090,6 @@ function editRemoteCompose() {
   if (noConfig)   noConfig.style.display   = '';
 }
 
-// Pre-fill compose textarea from an example and scroll to it
-function useComposeExample(exampleId) {
-  const example  = document.getElementById(exampleId);
-  const textarea = document.getElementById('remoteComposeInput');
-  const card     = document.getElementById('remoteNoConfig');
-  if (!example || !textarea) return;
-  textarea.value = example.textContent.trim();
-  // Show no-config state so textarea is visible
-  const loading    = document.getElementById('remoteLoading');
-  const configured = document.getElementById('remoteConfigured');
-  if (loading)    loading.style.display    = 'none';
-  if (configured) configured.style.display = 'none';
-  if (card)       card.style.display       = '';
-  textarea.scrollIntoView({ behavior: 'smooth', block: 'center' });
-  textarea.focus();
-}
 
 function _showRemoteMsg(text, type) {
   const el = document.getElementById('remoteApplyMsg');
