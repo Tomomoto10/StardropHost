@@ -1627,9 +1627,10 @@ function updateDashboardUI(data) {
 
   // Details
   const net = data.network || {};
-  setText('detail-join-ip',   net.joinIp || '--');
-  setText('detail-local-ips', net.localIps?.[0] || '--');
-  setText('detail-vnc',       data.vncEnabled ? `Enabled — port ${net.vncPort || 5900}` : 'Disabled');
+  setText('detail-join-ip',    net.joinIp || '--');
+  setText('detail-local-ips',  net.localIps?.[0] || '--');
+  setText('detail-panel-port', net.panelPort || 18642);
+  setText('detail-vnc',        data.vncEnabled ? `Enabled — port ${net.vncPort || 5900}` : 'Disabled');
 
   // Panel update notification (dashboard + config tab)
   function _renderPanelNotif(el) {

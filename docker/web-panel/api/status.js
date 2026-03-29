@@ -120,6 +120,7 @@ function getNetworkInfo(requestHost = '') {
     joinIp: configuredPublicIp || derivedJoinIp || localIps[0] || '',
     localIps,
     joinPort: 24642,
+    panelPort: parseInt(process.env.PANEL_PORT || '18642', 10),
     metricsPort: parseInt(process.env.METRICS_PORT || '9090', 10),
   };
 }
