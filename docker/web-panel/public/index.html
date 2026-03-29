@@ -700,7 +700,7 @@
                 <li>Name your agent (e.g. <code>StardropHost-1</code>) then press <strong>Next</strong></li>
                 <li>A setup page will appear — copy the <strong>64-character SECRET_KEY</strong> shown on the page<br>
                   <em style="color:var(--text-muted);font-size:12px">*You may need to click <strong>Exit Wizard</strong> if the screen doesn't refresh after this step</em></li>
-                <li>Open the <strong>Docker Compose Example</strong> card below, replace <code>YOUR_SECRET_KEY</code> with your copied key, then copy the full block of text</li>
+                <li>Open <strong>Docker Compose Example</strong> below, replace <code>YOUR_SECRET_KEY</code> with your copied key, then copy the full block of text</li>
                 <li>Paste the compose snippet into the <strong>Compose Entry</strong> card below and click <strong>Apply &amp; Connect</strong></li>
                 <li>The agent will show <strong>Connected</strong> in the playit.gg Agents tab once running</li>
                 <li>Continue to <strong>Tunnel Setup</strong> below</li>
@@ -713,11 +713,10 @@
               <ol class="remote-steps">
                 <li>Click the <strong>Tunnels</strong> tab on playit.gg → click <strong>Create Tunnel</strong></li>
                 <li>Name it (e.g. <code>Stardrop-Share</code>), select type <strong>UDP</strong><br>
-                  Set port count to <strong>1</strong> for game only, or <strong>2</strong> to also tunnel remote dashboard access</li>
+                  Set port count to <strong>1</strong></li>
                 <li>Give it a description (e.g. <em>Stardew Valley</em>), then complete the usage confirmation</li>
                 <li>For <strong>Public End Point</strong> — select the region closest to you <em style="color:var(--text-muted);font-size:12px">*Premium gives access to more regions</em></li>
-                <li>For <strong>Local IP &amp; Port</strong>: copy your server's <strong>LAN IP</strong> from the StardropHost dashboard home page and enter port <code>24642</code> for the game<br>
-                  <em style="color:var(--text-muted);font-size:12px">Change the port count to 2 in the earlier step to use your panel port number (default 18642) to remote access the StardropHost dashboard</em></li>
+                <li>For <strong>Local IP &amp; Port</strong>: copy your server's <strong>LAN IP</strong> from the StardropHost dashboard home page and enter port <code>24642</code> for the game</li>
                 <li>For <strong>Proxy Protocol</strong> — see <a href="https://playit.gg/support/what-is-proxy-protocol/" target="_blank" rel="noopener noreferrer">playit.gg/support/what-is-proxy-protocol</a></li>
                 <li>Press <strong>Next</strong>, select the agent created in the Agent Setup above, then click <strong>Create Tunnel</strong></li>
                 <li>Your tunnel is now active. In the <strong>Tunnels tab</strong> you will see:<br>
@@ -728,6 +727,23 @@
                   <strong style="font-size:14px;color:var(--text-primary)">Share either the domain name or the IP &amp; Port with your friends — they enter it in Stardew Valley's co-op join screen to connect from anywhere.</strong>
                 </li>
               </ol>
+              <p style="font-size:12px;color:var(--text-muted);margin:10px 0 4px;line-height:1.6"><strong>*To use StardropHost Dashboard remotely:</strong> Add another Tunnel to your Agent using the Dashboard Port displayed on the Dashboard Tab (default 18642)</p>
+            </details>
+
+            <!-- Docker Compose Example -->
+            <details class="remote-sub">
+              <summary>Docker Compose Example — playit.gg</summary>
+              <p style="font-size:13px;color:var(--text-secondary);margin:8px 0 10px;line-height:1.6">
+                Replace <code>YOUR_SECRET_KEY</code> with the 64-character key from your Agent Setup, then
+                copy the <strong>entire block below</strong> and paste it into the Compose Entry card.
+              </p>
+              <pre style="background:var(--bg-primary);border:1px solid var(--border);border-radius:6px;padding:12px;font-size:12px;overflow-x:auto;margin:0;line-height:1.6;color:var(--text-primary)">services:
+  playit:
+    image: ghcr.io/playit-cloud/playit-agent:0.17
+    network_mode: host
+    restart: unless-stopped
+    environment:
+      - SECRET_KEY=YOUR_SECRET_KEY</pre>
             </details>
 
           </details>
@@ -746,26 +762,6 @@
               <button class="btn btn-primary" type="button" id="remoteApplyBtn" onclick="applyRemoteCompose()">Apply &amp; Connect</button>
             </div>
           </div>
-
-          <!-- Docker Compose example (collapsible) -->
-          <details class="card remote-guide" style="margin-bottom:16px">
-            <summary>
-              <span style="font-weight:600;font-size:15px">Docker Compose Example — playit.gg</span>
-            </summary>
-            <div style="margin-top:14px;border-top:1px solid var(--border);padding-top:14px">
-              <p style="font-size:13px;color:var(--text-secondary);margin:0 0 12px;line-height:1.6">
-                Replace <code>YOUR_SECRET_KEY</code> with the 64-character key from your Agent Setup, then
-                copy the <strong>entire block below</strong> and paste it into the Compose Entry card.
-              </p>
-              <pre style="background:var(--bg-primary);border:1px solid var(--border);border-radius:6px;padding:12px;font-size:12px;overflow-x:auto;margin:0;line-height:1.6;color:var(--text-primary)">services:
-  playit:
-    image: ghcr.io/playit-cloud/playit-agent:0.17
-    network_mode: host
-    restart: unless-stopped
-    environment:
-      - SECRET_KEY=YOUR_SECRET_KEY</pre>
-            </div>
-          </details>
 
           <!-- Other services (collapsible) -->
           <details class="card remote-guide">
