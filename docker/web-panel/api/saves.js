@@ -38,15 +38,18 @@ function removePath(targetPath) {
   if (fs.existsSync(targetPath)) runCommand('rm', ['-rf', targetPath]);
 }
 
-function getBackupCompressionLevel() {
-  const raw = parseInt(process.env.BACKUP_COMPRESSION_LEVEL || '1', 10);
-  return Number.isNaN(raw) ? 1 : Math.min(9, Math.max(1, raw));
-}
-
-function getTarGzipArgs(outputPath, sourceBaseDir, sourceNames, verbose) {
-  const level = getBackupCompressionLevel();
-  const args  = ['-I', `gzip -${level}`, verbose ? '-cvf' : '-cf', outputPath, '-C', sourceBaseDir];
-  return args.concat(sourceNames);
+function getFarmSlug() {
+  try {
+    const selectedSave = getSelectedSaveName();
+    if (selectedSave) {
+      const meta = parseSaveGameInfo(path.join(config.SAVES_DIR, selectedSave));
+      if (meta.farmName) {
+        const slug = meta.farmName.toLowerCase().replace(/\s+/g, '_').replace(/[^a-z0-9_-]/g, '');
+        if (slug) return slug;
+      }
+    }
+  } catch {}
+  return 'stardrop';
 }
 
 // -- Save selection --
@@ -327,7 +330,8 @@ function startBackupJob() {
   ensureDir(config.DATA_DIR);
 
   const timestamp    = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
-  const backupName   = `stardrop-manual-backup-${timestamp}.tar.gz`;
+  const farmSlug     = getFarmSlug();
+  const backupName   = `${farmSlug}-manual-backup-${timestamp}.zip`;
   const backupPath   = path.join(config.BACKUPS_DIR, backupName);
   const totalEntries = Math.max(1, countEntries(config.SAVES_DIR) + 1);
   const taskId       = `backup-${Date.now()}`;
@@ -342,12 +346,14 @@ function startBackupJob() {
   };
   writeBackupStatus(initialStatus);
 
-  const tarProc = spawn('tar', getTarGzipArgs(
-    backupPath,
-    path.dirname(config.SAVES_DIR),
-    [path.basename(config.SAVES_DIR)],
-    true
-  ), { stdio: ['ignore', 'pipe', 'pipe'] });
+  const tarProc = spawn('zip', [
+    '-r', backupPath,
+    path.basename(config.SAVES_DIR),
+    '-x', '*/ErrorLogs/*',
+  ], {
+    cwd: path.dirname(config.SAVES_DIR),
+    stdio: ['ignore', 'pipe', 'pipe'],
+  });
 
   activeBackup = { id: taskId, pid: tarProc.pid, backupPath };
   writeBackupStatus({ ...initialStatus, pid: tarProc.pid, message: 'Archiving save files' });

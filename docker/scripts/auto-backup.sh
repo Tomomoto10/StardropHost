@@ -31,10 +31,35 @@ mkdir -p "$BACKUP_DIR"
 
 LAST_BACKUP_TIME=0
 
+get_farm_slug() {
+    local prefs="$SAVE_DIR/startup_preferences"
+    local save_name farm_name farm_slug
+
+    # Read selected save name (XML or plain format)
+    save_name=$(grep -o '<saveFolderName>[^<]*</saveFolderName>' "$prefs" 2>/dev/null \
+                | sed 's/<[^>]*>//g' | head -1)
+    if [ -z "$save_name" ]; then
+        save_name=$(grep 'saveFolderName=' "$prefs" 2>/dev/null \
+                    | sed 's/.*saveFolderName=\s*//' | tr -d '\r' | head -1)
+    fi
+
+    if [ -n "$save_name" ]; then
+        local save_xml="$SAVE_DIR/Saves/$save_name/$save_name"
+        farm_name=$(grep -o '<farmName>[^<]*</farmName>' "$save_xml" 2>/dev/null \
+                    | sed 's/<[^>]*>//g' | head -1)
+        if [ -n "$farm_name" ]; then
+            farm_slug=$(echo "$farm_name" | tr '[:upper:]' '[:lower:]' | tr ' ' '_' | tr -cd 'a-z0-9_-')
+        fi
+    fi
+
+    echo "${farm_slug:-stardrop}"
+}
+
 do_backup() {
-    local timestamp
+    local timestamp farm_slug backup_file
     timestamp=$(date +%Y-%m-%dT%H-%M-%S)
-    local backup_file="$BACKUP_DIR/stardrop-auto-backup-$timestamp.zip"
+    farm_slug=$(get_farm_slug)
+    backup_file="$BACKUP_DIR/${farm_slug}-auto-backup-$timestamp.zip"
 
     log "Starting backup..."
 
@@ -59,17 +84,17 @@ do_backup() {
     size=$(du -h "$backup_file" 2>/dev/null | cut -f1)
     log "✅ Backup complete: $backup_file ($size)"
 
-    # Cleanup old backups
+    # Cleanup old backups (match any *-auto-backup-*.zip pattern)
     local backup_count
-    backup_count=$(ls -1t "$BACKUP_DIR"/stardrop-auto-backup-*.zip 2>/dev/null | wc -l)
+    backup_count=$(ls -1t "$BACKUP_DIR"/*-auto-backup-*.zip 2>/dev/null | wc -l)
     if [ "$backup_count" -gt "$MAX_BACKUPS" ]; then
         local to_delete=$((backup_count - MAX_BACKUPS))
         log "  Removing $to_delete old backup(s)..."
-        ls -1t "$BACKUP_DIR"/stardrop-auto-backup-*.zip | tail -n "$to_delete" | xargs rm -f
+        ls -1t "$BACKUP_DIR"/*-auto-backup-*.zip | tail -n "$to_delete" | xargs rm -f
         log "  ✅ Old backups removed"
     fi
 
-    log "  Backups: $(ls -1 "$BACKUP_DIR"/stardrop-auto-backup-*.zip 2>/dev/null | wc -l) / $MAX_BACKUPS"
+    log "  Backups: $(ls -1 "$BACKUP_DIR"/*-auto-backup-*.zip 2>/dev/null | wc -l) / $MAX_BACKUPS"
 
     LAST_BACKUP_TIME=$(date +%s)
     return 0

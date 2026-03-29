@@ -320,7 +320,9 @@
               </div>
             </div>
             <div class="card stat-card">
-              <div class="stat-icon"><svg class="icon"><use href="#icon-globe"></use></svg></div>
+              <div class="stat-icon" id="stat-remote-icon">
+                <svg class="icon"><use href="#icon-globe"></use></svg>
+              </div>
               <div class="stat-info">
                 <div class="stat-value" id="stat-remote">--</div>
                 <div class="stat-label">Remote Access</div>
@@ -400,20 +402,17 @@
               <div class="detail-item">
                 <div class="detail-label">VNC</div>
                 <div class="detail-value" id="detail-vnc">--</div>
+                <div class="detail-note">Controlled from the Config tab.</div>
               </div>
             </div>
           </div>
 
           <div id="panelUpdateNotification" style="display:none"></div>
           <div id="gameUpdateNotification" style="display:none"></div>
-          <div id="updateCheckBar" style="display:none;text-align:right;margin-bottom:8px">
-            <button class="btn btn-sm btn-secondary" type="button" id="checkUpdatesBtn" onclick="checkAllUpdates()">Check for Updates</button>
-          </div>
 
           <div class="card">
             <h3>Quick Actions</h3>
             <div class="action-buttons" id="quickActionsContainer"></div>
-            <div id="dashboardBackupStatus" class="backup-status" style="display:none"></div>
           </div>
 
         </section>
@@ -642,7 +641,7 @@
                 <button class="btn btn-primary" type="button" id="remoteStartBtn"  onclick="startRemoteService()"  style="display:none">Resume</button>
                 <button class="btn"             type="button" id="remoteStopBtn"   onclick="stopRemoteService()"   style="display:none">Pause</button>
                 <button class="btn"             type="button" id="remoteRemoveBtn" onclick="removeRemoteService()"
-                  style="color:#ef4444;border-color:#ef4444">Remove &amp; Stop</button>
+                  style="color:#ef4444;border-color:#ef4444">Stop &amp; Remove</button>
               </div>
               <details style="margin-top:12px">
                 <summary style="font-size:12px;color:var(--text-muted);cursor:pointer;user-select:none">Show current compose config — useful if needing to delete farm and restart</summary>

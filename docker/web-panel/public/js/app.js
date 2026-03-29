@@ -1406,18 +1406,13 @@ function handleWsMessage(msg) {
 const QUICK_ACTION_DEFS = {
   'restart-server': { label: 'Restart Server',    icon: 'icon-refresh',  cls: 'btn-warning',   onclick: 'restartServer()' },
   'toggle-server':  { label: 'Start/Stop Server', icon: 'icon-refresh',  cls: 'btn-secondary', onclick: 'toggleServer()' },
+  'check-update':   { label: 'Check for Updates', icon: 'icon-download', cls: 'btn-secondary', onclick: 'checkAllUpdates()' },
+  'toggle-remote':  { label: 'Remote',            icon: 'icon-globe',    cls: 'btn-secondary', onclick: 'toggleRemote()' },
   'backup-now':     { label: 'Backup Now',         icon: 'icon-saves',    cls: 'btn-success',   onclick: 'createBackup()' },
-  'view-logs':      { label: 'View Logs',          icon: 'icon-logs',     cls: 'btn-primary',   onclick: "navigateTo('logs')" },
-  'farm-overview':  { label: 'Farm Overview',      icon: 'icon-sprout',   cls: 'btn-secondary', onclick: "navigateTo('farm')" },
-  'manage-players': { label: 'Manage Players',     icon: 'icon-players',  cls: 'btn-secondary', onclick: "navigateTo('players')" },
-  'manage-saves':   { label: 'Manage Saves',       icon: 'icon-saves',    cls: 'btn-secondary', onclick: "navigateTo('saves')" },
-  'manage-mods':    { label: 'Manage Mods',        icon: 'icon-mods',     cls: 'btn-secondary', onclick: "navigateTo('mods')" },
-  'open-terminal':  { label: 'Open Terminal',      icon: 'icon-terminal', cls: 'btn-secondary', onclick: "navigateTo('terminal')" },
-  'open-config':    { label: 'Open Config',        icon: 'icon-config',   cls: 'btn-secondary', onclick: "navigateTo('config')" },
 };
 
 const QUICK_ACTIONS_KEY     = 'stardrop_quick_actions';
-const QUICK_ACTIONS_DEFAULT = ['restart-server', 'backup-now'];
+const QUICK_ACTIONS_DEFAULT = ['restart-server', 'toggle-server', 'check-update', 'toggle-remote'];
 
 let quickActionsEditMode = false;
 let qasDragSrcId        = null;
@@ -1440,6 +1435,14 @@ function _qaButtonDef(id) {
     return running
       ? { label: 'Stop Server',  icon: 'icon-screen',  cls: 'btn-danger',  onclick: 'stopServer()',  disabled: isTransitioning }
       : { label: 'Start Server', icon: 'icon-refresh', cls: 'btn-success', onclick: 'startServer()', disabled: isTransitioning };
+  }
+  if (id === 'toggle-remote') {
+    if (!lastRemoteData?.configured) {
+      return { label: 'Setup Remote', icon: 'icon-globe', cls: 'btn-secondary', onclick: "navigateTo('remote')" };
+    }
+    return lastRemoteData.anyRunning
+      ? { label: 'Pause Remote',  icon: 'icon-globe', cls: 'btn-secondary', onclick: 'stopRemoteService()',  disabled: !!_remoteOptimisticState }
+      : { label: 'Resume Remote', icon: 'icon-globe', cls: 'btn-success',   onclick: 'startRemoteService()', disabled: !!_remoteOptimisticState };
   }
   return QUICK_ACTION_DEFS[id];
 }
@@ -1628,17 +1631,13 @@ function updateDashboardUI(data) {
   setText('detail-local-ips', net.localIps?.[0] || '--');
   setText('detail-vnc',       data.vncEnabled ? `Enabled — port ${net.vncPort || 5900}` : 'Disabled');
 
-  // Show "Check for Updates" bar once the server is running
-  const updateCheckBar = document.getElementById('updateCheckBar');
-  if (updateCheckBar) updateCheckBar.style.display = liveRunning ? '' : 'none';
-
-  // Panel update notification (StardropHost itself)
-  const panelNotif = document.getElementById('panelUpdateNotification');
-  if (panelNotif) {
+  // Panel update notification (dashboard + config tab)
+  function _renderPanelNotif(el) {
+    if (!el) return;
     if (liveRunning && data.panelUpdateAvailable) {
       const info = data.panelUpdateInfo || {};
       const sub  = info.message ? `"${info.message.substring(0, 60)}${info.message.length > 60 ? '…' : ''}"` : 'A new version is available';
-      panelNotif.innerHTML = `
+      el.innerHTML = `
         <div class="update-notification" onclick="selfUpdate()" title="Click to update StardropHost">
           <div class="update-notification-icon">🔄</div>
           <div class="update-notification-text">
@@ -1647,19 +1646,21 @@ function updateDashboardUI(data) {
           </div>
           <span style="color:var(--accent);font-size:18px;flex-shrink:0">›</span>
         </div>`;
-      panelNotif.style.display = '';
+      el.style.display = '';
     } else {
-      panelNotif.style.display = 'none';
+      el.style.display = 'none';
     }
   }
+  _renderPanelNotif(document.getElementById('panelUpdateNotification'));
+  _renderPanelNotif(document.getElementById('configPanelUpdateNotif'));
 
-  // Game update notification
-  const notif = document.getElementById('gameUpdateNotification');
-  if (notif) {
+  // Game update notification (dashboard + config tab)
+  function _renderGameNotif(el) {
+    if (!el) return;
     if (liveRunning && data.gameUpdateAvailable) {
       const builds = data.gameUpdateBuilds || {};
       const sub = builds.latest ? `Build ${builds.current || '?'} → ${builds.latest}` : 'A new version is available';
-      notif.innerHTML = `
+      el.innerHTML = `
         <div class="update-notification" onclick="openGameUpdateModal()" title="Click to update">
           <div class="update-notification-icon">⬆</div>
           <div class="update-notification-text">
@@ -1668,11 +1669,13 @@ function updateDashboardUI(data) {
           </div>
           <span style="color:var(--accent);font-size:18px;flex-shrink:0">›</span>
         </div>`;
-      notif.style.display = '';
+      el.style.display = '';
     } else {
-      notif.style.display = 'none';
+      el.style.display = 'none';
     }
   }
+  _renderGameNotif(document.getElementById('gameUpdateNotification'));
+  _renderGameNotif(document.getElementById('configGameUpdateNotif'));
 
 }
 
@@ -2135,6 +2138,15 @@ async function loadBackupStatus(silent = false) {
 function applyBackupStatus(status, silent = false) {
   const prevState  = lastBackupStatus?.state;
   lastBackupStatus = status;
+
+  // If the backup was already completed before we started watching, don't show the banner
+  if (status?.state === 'completed' && prevState !== 'running') {
+    lastBackupStatus = null;
+    renderBackupStatus({ state: 'idle' });
+    stopBackupStatusPolling();
+    return;
+  }
+
   renderBackupStatus(status);
 
   if (status?.state === 'running') { startBackupStatusPolling(); return; }
@@ -2144,7 +2156,6 @@ function applyBackupStatus(status, silent = false) {
   if (!silent) {
     if (prevState === 'running' && status?.state === 'completed') {
       showToast('Backup created!', 'success');
-      // Auto-hide the completed banner after 4 seconds
       setTimeout(() => {
         lastBackupStatus = null;
         renderBackupStatus({ state: 'idle' });
@@ -2161,7 +2172,7 @@ function applyBackupStatus(status, silent = false) {
 
 function renderBackupStatus(status) {
   const active = status?.state && status.state !== 'idle';
-  ['dashboardBackupStatus', 'savesBackupStatus'].forEach(id => {
+  ['savesBackupStatus'].forEach(id => {
     const el = document.getElementById(id);
     if (!el) return;
     if (!active) { el.style.display = 'none'; el.innerHTML = ''; return; }
@@ -2334,12 +2345,30 @@ async function loadConfig() {
       card.insertBefore(remoteRow, card.firstChild.nextSibling);
       card.insertBefore(statusRow, card.firstChild.nextSibling);
 
+      // Update notifications (same as dashboard)
+      const cfgPanelNotif = document.createElement('div');
+      cfgPanelNotif.id = 'configPanelUpdateNotif';
+      cfgPanelNotif.style.display = 'none';
+      card.appendChild(cfgPanelNotif);
+
+      const cfgGameNotif = document.createElement('div');
+      cfgGameNotif.id = 'configGameUpdateNotif';
+      cfgGameNotif.style.display = 'none';
+      card.appendChild(cfgGameNotif);
+
       const sep = document.createElement('div');
       sep.style.cssText = 'border-top:1px solid var(--border);margin:14px 0 10px';
       card.appendChild(sep);
+
       const actions = document.createElement('div');
       actions.className = 'action-buttons';
-      const _dis = isTransitioning ? ' disabled' : '';
+      const _dis  = isTransitioning ? ' disabled' : '';
+      const _rdis = _remoteOptimisticState ? ' disabled' : '';
+      const remBtn = !lastRemoteData?.configured
+        ? `<button class="btn btn-sm btn-secondary" type="button" onclick="navigateTo('remote')">Setup Remote</button>`
+        : lastRemoteData.anyRunning
+          ? `<button class="btn btn-sm btn-secondary" type="button" onclick="stopRemoteService()"${_rdis}>Pause Remote</button>`
+          : `<button class="btn btn-sm btn-success"    type="button" onclick="startRemoteService()"${_rdis}>Resume Remote</button>`;
       actions.innerHTML =
         `<button id="serverToggleBtn" class="btn btn-sm ${running ? 'btn-danger' : 'btn-success'}" type="button"
            onclick="${running ? 'stopServer()' : 'startServer()'}"${_dis}>
@@ -2347,7 +2376,11 @@ async function loadConfig() {
          </button>
          <button class="btn btn-sm btn-warning" type="button" onclick="restartServer()"${_dis}>
            Restart Server
-         </button>`;
+         </button>
+         <button class="btn btn-sm btn-secondary" type="button" onclick="checkAllUpdates()">
+           Check for Updates
+         </button>
+         ${remBtn}`;
       card.appendChild(actions);
     }
 
@@ -2460,7 +2493,12 @@ async function loadVnc() {
         ? `<button class="btn btn-sm" style="color:#ef4444;border-color:#ef4444" onclick="vncDisable()">Stop VNC</button>`
         : `<button class="btn btn-sm btn-success" onclick="vncEnable()">Start VNC Now</button>`}
     </div>
-    <div class="config-group" style="margin-top:8px">${cfgRows}</div>
+    <details style="margin-top:4px">
+      <summary style="font-size:13px;color:var(--text-muted);cursor:pointer;user-select:none">
+        Display &amp; Password Settings
+      </summary>
+      <div class="config-group" style="margin-top:12px">${cfgRows}</div>
+    </details>
   `;
 }
 
@@ -2642,6 +2680,12 @@ async function _pollServerState(targetRunning, timeoutMs) {
 async function toggleServer() {
   if (lastStatusData?.gameRunning) await stopServer();
   else await startServer();
+}
+
+function toggleRemote() {
+  if (!lastRemoteData?.configured) { navigateTo('remote'); return; }
+  if (lastRemoteData.anyRunning) stopRemoteService();
+  else startRemoteService();
 }
 
 function updateServerToggleBtn(transitioning = false) {
@@ -3022,6 +3066,11 @@ async function loadRemoteStatus() {
       _renderRemoteServices(data.services || [], data.anyRunning);
       const yamlEl = document.getElementById('remoteCurrentYaml');
       if (yamlEl) yamlEl.textContent = data.yaml || '';
+      // Lock compose entry while a service is configured
+      _lockComposeEntry(true);
+    } else {
+      // Service was removed — re-enable compose entry
+      _lockComposeEntry(false);
     }
   } catch {
     if (loading)    loading.style.display    = 'none';
@@ -3032,27 +3081,32 @@ async function loadRemoteStatus() {
 
 function _updateRemoteBadge() {
   // Derive display state: optimistic overrides actual
-  let text, color;
+  let text, orbClass;
   if (_remoteOptimisticState === 'starting') {
-    text = 'Starting'; color = '#f59e0b';
+    text = 'Starting'; orbClass = 'restarting';
   } else if (_remoteOptimisticState === 'stopping') {
-    text = 'Stopping'; color = 'var(--text-muted)';
+    text = 'Stopping'; orbClass = 'restarting';
   } else if (!lastRemoteData?.configured) {
-    text = 'Not Setup'; color = 'var(--text-muted)';
+    text = 'Not Setup'; orbClass = 'offline';
   } else if (lastRemoteData.anyRunning) {
-    text = 'Active'; color = '#22c55e';
+    text = 'Active'; orbClass = 'running';
   } else {
-    text = 'Stopped'; color = '#ef4444';
+    text = 'Stopped'; orbClass = 'offline';
   }
 
-  const dashEl = document.getElementById('stat-remote');
-  if (dashEl) dashEl.innerHTML = `<span style="color:${color}">● ${escapeHtml(text)}</span>`;
+  const iconEl = document.getElementById('stat-remote-icon');
+  if (iconEl) iconEl.innerHTML = `<span class="status-orb ${orbClass}"></span>`;
+
+  setText('stat-remote', text);
 
   const cfgEl = document.getElementById('configRemoteStatusBadge');
   if (cfgEl) {
+    const color = orbClass === 'running' ? '#22c55e' : orbClass === 'restarting' ? '#f59e0b' : 'var(--text-muted)';
     cfgEl.textContent = `● ${text}`;
     cfgEl.style.color = color;
   }
+
+  renderQuickActions();
 }
 
 function _renderRemoteServices(services, anyRunning) {
@@ -3084,6 +3138,26 @@ function _renderRemoteServices(services, anyRunning) {
   }).join('');
 }
 
+function _lockComposeEntry(locked) {
+  const textarea = document.getElementById('remoteComposeInput');
+  const btn      = document.getElementById('remoteApplyBtn');
+  const msgEl    = document.getElementById('remoteApplyMsg');
+  if (textarea) textarea.disabled = locked;
+  if (btn) {
+    btn.disabled    = locked;
+    btn.textContent = locked ? 'Service Active' : 'Apply & Connect';
+  }
+  if (msgEl) {
+    if (locked) {
+      msgEl.textContent   = 'Stop & Remove the current service to start a new one.';
+      msgEl.style.color   = 'var(--text-muted)';
+      msgEl.style.display = '';
+    } else {
+      msgEl.style.display = 'none';
+    }
+  }
+}
+
 async function applyRemoteCompose() {
   const textarea = document.getElementById('remoteComposeInput');
   const btn      = document.getElementById('remoteApplyBtn');
@@ -3109,7 +3183,7 @@ async function applyRemoteCompose() {
   try {
     await API.post('/api/remote/apply', { yaml });
     textarea.value = '';
-    await loadRemoteStatus();
+    await loadRemoteStatus(); // _lockComposeEntry(true) is called inside on configured
   } catch (e) {
     _remoteOptimisticState = null;
     _updateRemoteBadge();
@@ -3158,6 +3232,7 @@ async function stopRemoteService() {
 }
 
 async function removeRemoteService() {
+  if (!confirm('Stop and remove the remote tunnel service? This will disconnect any active remote connections.')) return;
   const btn = document.getElementById('remoteRemoveBtn');
   btn.disabled    = true;
   btn.textContent = 'Removing...';

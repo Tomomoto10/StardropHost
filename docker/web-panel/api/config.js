@@ -63,7 +63,7 @@ const CONFIG_SCHEMA = {
   ],
   'Server': [
     { key: 'PANEL_UPDATE_CHECK_HOURS', label: 'Update checks', type: 'number', default: '24',
-      description: 'Hours between update checks. Leave empty to disable.' },
+      description: 'Frequency of update checks. Leave empty to disable.' },
   ],
 };
 
