@@ -18,8 +18,7 @@ let lastLogParse = 0;
 
 // -- Recent players tracking --
 const playerSnapshots = new Map(); // id → rich player data from live-status.json
-const recentPlayers   = new Map(); // id → { ...playerData, lastSeen }
-const RECENT_EXPIRE_MS = 24 * 60 * 60 * 1000;
+const recentPlayers   = new Map(); // id → { ...playerData, lastSeen } — persists until manually deleted
 
 // -- Ban list --
 const BAN_LIST_FILE = require('path').join(config.DATA_DIR, 'bans.json');
@@ -194,12 +193,6 @@ function getPlayers(req, res) {
     }
   }
 
-  // Expire recent players older than 24h
-  const now = Date.now();
-  for (const [id, p] of recentPlayers) {
-    if (now - p.lastSeen > RECENT_EXPIRE_MS) recentPlayers.delete(id);
-  }
-
   const bans = loadBans();
   const bannedIds   = new Set(bans.map(b => b.id).filter(Boolean));
   const bannedNames = new Set(bans.map(b => b.name).filter(Boolean));
@@ -261,6 +254,13 @@ function unbanPlayer(req, res) {
   res.json({ success: true, message: `Unbanned ${target}` });
 }
 
+function deleteRecentPlayer(req, res) {
+  const { id } = req.body || {};
+  if (!id) return res.status(400).json({ error: 'id is required' });
+  recentPlayers.delete(String(id));
+  res.json({ success: true });
+}
+
 function grantAdmin(req, res) {
   const { id, name } = req.body;
   if (!id && !name) {
@@ -283,4 +283,5 @@ module.exports = {
   banPlayer,
   unbanPlayer,
   grantAdmin,
+  deleteRecentPlayer,
 };

@@ -21,8 +21,11 @@ function getCategorizedLogPath(filter) {
 }
 
 function getLogSource(filter) {
-  if (filter === 'all' || filter === 'smapi') {
+  if (filter === 'all') {
     return { path: config.SMAPI_LOG, filtered: false };
+  }
+  if (filter === 'smapi') {
+    return { path: config.SMAPI_LOG, filtered: true };
   }
 
   const categorizedPath = getCategorizedLogPath(filter);

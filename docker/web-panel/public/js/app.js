@@ -1952,6 +1952,8 @@ async function loadPlayers() {
             ? `<button class="btn btn-sm btn-secondary" onclick="unbanPlayer(this,'${escapeHtml(p.id)}','${escapeHtml(p.name)}')">Unban</button>`
             : `<button class="btn btn-sm btn-danger" onclick="banPlayer(this,'${escapeHtml(p.id)}','${escapeHtml(p.name)}')">Ban</button>`
           }
+          <button class="btn btn-sm" style="color:var(--text-muted);border-color:var(--border)"
+            onclick="deleteRecentPlayer(this,'${escapeHtml(p.id)}')">Remove</button>
         </div>
       </div>
     `).join('');
@@ -2137,8 +2139,15 @@ function applyBackupStatus(status, silent = false) {
   stopBackupStatusPolling();
 
   if (!silent) {
-    if (prevState === 'running' && status?.state === 'completed') showToast('Backup created!', 'success');
-    if (prevState === 'running' && status?.state === 'failed')    showToast(status.error || 'Backup failed', 'error');
+    if (prevState === 'running' && status?.state === 'completed') {
+      showToast('Backup created!', 'success');
+      // Auto-hide the completed banner after 4 seconds
+      setTimeout(() => {
+        lastBackupStatus = null;
+        renderBackupStatus({ state: 'idle' });
+      }, 4000);
+    }
+    if (prevState === 'running' && status?.state === 'failed') showToast(status.error || 'Backup failed', 'error');
   }
 
   if (status?.state !== 'running') {
@@ -2279,12 +2288,27 @@ async function loadConfig() {
       card.appendChild(row);
     }
 
-    // Server group: append Start/Stop toggle
+    // Server group: prepend status indicator + append Start/Stop toggle
     if (group.name === 'Server') {
+      const running    = !!(lastStatusData?.gameRunning);
+      const stopping   = isStopping;
+      const starting   = isStarting || isGameRestarting;
+      const statusText = stopping ? 'Stopping…' : starting ? 'Starting…' : running ? 'Running' : 'Stopped';
+      const statusCol  = stopping ? '#f59e0b' : starting ? '#f59e0b' : running ? '#22c55e' : 'var(--text-muted)';
+
+      const statusRow = document.createElement('div');
+      statusRow.className = 'config-item';
+      statusRow.style.cssText = 'border-bottom:1px solid var(--border);padding-bottom:14px;margin-bottom:4px';
+      statusRow.innerHTML =
+        `<div><div class="config-label">Server Status</div></div>
+         <div class="config-value">
+           <span id="configServerStatusBadge" style="font-weight:600;color:${statusCol}">● ${escapeHtml(statusText)}</span>
+         </div>`;
+      card.insertBefore(statusRow, card.firstChild.nextSibling);
+
       const sep = document.createElement('div');
       sep.style.cssText = 'border-top:1px solid var(--border);margin:14px 0 10px';
       card.appendChild(sep);
-      const running = !!(lastStatusData?.gameRunning);
       const actions = document.createElement('div');
       actions.className = 'action-buttons';
       const _dis = isTransitioning ? ' disabled' : '';
@@ -3080,14 +3104,14 @@ async function removeRemoteService() {
 }
 
 function editRemoteCompose() {
-  // Switch back to the textarea pre-filled with current YAML
+  // Pre-fill the compose textarea with the current YAML and scroll to it
   const yamlEl   = document.getElementById('remoteCurrentYaml');
   const textarea = document.getElementById('remoteComposeInput');
-  const configured = document.getElementById('remoteConfigured');
-  const noConfig   = document.getElementById('remoteNoConfig');
-  if (textarea && yamlEl) textarea.value = yamlEl.textContent;
-  if (configured) configured.style.display = 'none';
-  if (noConfig)   noConfig.style.display   = '';
+  if (textarea && yamlEl) {
+    textarea.value = yamlEl.textContent.trim();
+    textarea.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    textarea.focus();
+  }
 }
 
 

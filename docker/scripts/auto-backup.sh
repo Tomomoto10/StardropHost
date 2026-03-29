@@ -33,8 +33,8 @@ LAST_BACKUP_TIME=0
 
 do_backup() {
     local timestamp
-    timestamp=$(date +%Y%m%d-%H%M%S)
-    local backup_file="$BACKUP_DIR/saves-$timestamp.tar.gz"
+    timestamp=$(date +%Y-%m-%dT%H-%M-%S)
+    local backup_file="$BACKUP_DIR/stardrop-auto-backup-$timestamp.zip"
 
     log "Starting backup..."
 
@@ -47,10 +47,7 @@ do_backup() {
     file_count=$(find "$SAVE_DIR" -type f 2>/dev/null | wc -l)
     log "  Files to backup: $file_count"
 
-    tar -I "gzip -${BACKUP_COMPRESSION_LEVEL}" \
-        -cf "$backup_file" \
-        -C "$(dirname "$SAVE_DIR")" \
-        "$(basename "$SAVE_DIR")" 2>/dev/null
+    (cd "$(dirname "$SAVE_DIR")" && zip -r "$backup_file" "$(basename "$SAVE_DIR")" -x "*/ErrorLogs/*") 2>/dev/null
 
     if [ $? -ne 0 ]; then
         log "❌ Backup failed"
@@ -64,15 +61,15 @@ do_backup() {
 
     # Cleanup old backups
     local backup_count
-    backup_count=$(ls -1t "$BACKUP_DIR"/saves-*.tar.gz 2>/dev/null | wc -l)
+    backup_count=$(ls -1t "$BACKUP_DIR"/stardrop-auto-backup-*.zip 2>/dev/null | wc -l)
     if [ "$backup_count" -gt "$MAX_BACKUPS" ]; then
         local to_delete=$((backup_count - MAX_BACKUPS))
         log "  Removing $to_delete old backup(s)..."
-        ls -1t "$BACKUP_DIR"/saves-*.tar.gz | tail -n "$to_delete" | xargs rm -f
+        ls -1t "$BACKUP_DIR"/stardrop-auto-backup-*.zip | tail -n "$to_delete" | xargs rm -f
         log "  ✅ Old backups removed"
     fi
 
-    log "  Backups: $(ls -1 "$BACKUP_DIR"/saves-*.tar.gz 2>/dev/null | wc -l) / $MAX_BACKUPS"
+    log "  Backups: $(ls -1 "$BACKUP_DIR"/stardrop-auto-backup-*.zip 2>/dev/null | wc -l) / $MAX_BACKUPS"
 
     LAST_BACKUP_TIME=$(date +%s)
     return 0

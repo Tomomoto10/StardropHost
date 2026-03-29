@@ -84,6 +84,7 @@ app.post('/api/players/kick',        auth.verifyMiddleware, playersAPI.kickPlaye
 app.post('/api/players/ban',         auth.verifyMiddleware, playersAPI.banPlayer);
 app.post('/api/players/unban',       auth.verifyMiddleware, playersAPI.unbanPlayer);
 app.post('/api/players/admin',       auth.verifyMiddleware, playersAPI.grantAdmin);
+app.post('/api/players/recent/delete', auth.verifyMiddleware, playersAPI.deleteRecentPlayer);
 
 // -- Saves --
 const savesAPI = require('./api/saves');

@@ -58,13 +58,12 @@ const CONFIG_SCHEMA = {
     { key: 'MAX_CRASH_RESTARTS',   label: 'Max Restarts',       type: 'number',  default: '3' },
   ],
   'Monitoring': [
-    { key: 'ENABLE_LOG_MONITOR',          label: 'Log Monitor',                   type: 'boolean', default: 'true' },
-    { key: 'METRICS_PORT',                label: 'Metrics Port',                  type: 'number',  default: '9090' },
-    { key: 'PANEL_UPDATE_CHECK_HOURS',    label: 'Panel Update Check (hours)',    type: 'number',  default: '24',
-      description: 'How often to check GitHub for StardropHost updates. Set to 0 to disable.' },
+    { key: 'ENABLE_LOG_MONITOR',  label: 'Log Monitor',   type: 'boolean', default: 'true' },
+    { key: 'METRICS_PORT',        label: 'Metrics Port',  type: 'number',  default: '9090' },
   ],
   'Server': [
-    { key: 'SERVER_PASSWORD',  label: 'Server Password',  type: 'password', viewable: true, default: '' },
+    { key: 'PANEL_UPDATE_CHECK_HOURS', label: 'Update checks', type: 'number', default: '24',
+      description: 'How often to check for StardropHost and game updates. Leave empty to disable auto checks.' },
   ],
 };
 

@@ -253,13 +253,13 @@
           <span class="nav-icon"><svg class="icon"><use href="#icon-terminal"></use></svg></span>
           <span class="nav-label">Console</span>
         </li>
-        <li class="nav-item" data-page="config">
-          <span class="nav-icon"><svg class="icon"><use href="#icon-config"></use></svg></span>
-          <span class="nav-label">Config</span>
-        </li>
         <li class="nav-item" data-page="remote">
           <span class="nav-icon"><svg class="icon"><use href="#icon-globe"></use></svg></span>
           <span class="nav-label">Remote</span>
+        </li>
+        <li class="nav-item" data-page="config">
+          <span class="nav-icon"><svg class="icon"><use href="#icon-config"></use></svg></span>
+          <span class="nav-label">Config</span>
         </li>
       </ul>
       <div id="sidebarVersion" style="text-align:center;font-size:11px;color:var(--text-muted);padding:4px 0 0;opacity:0.6"></div>
@@ -284,8 +284,8 @@
       <button class="mob-nav-item" type="button" data-page="saves"><svg class="icon"><use href="#icon-saves"></use></svg></button>
       <button class="mob-nav-item" type="button" data-page="mods"><svg class="icon"><use href="#icon-mods"></use></svg></button>
       <button class="mob-nav-item" type="button" data-page="terminal"><svg class="icon"><use href="#icon-terminal"></use></svg></button>
-      <button class="mob-nav-item" type="button" data-page="config"><svg class="icon"><use href="#icon-config"></use></svg></button>
       <button class="mob-nav-item" type="button" data-page="remote"><svg class="icon"><use href="#icon-globe"></use></svg></button>
+      <button class="mob-nav-item" type="button" data-page="config"><svg class="icon"><use href="#icon-config"></use></svg></button>
     </nav>
 
     <!-- Main content -->
@@ -588,34 +588,80 @@
         <!-- ── Remote ──────────────────────────────────────────── -->
         <section id="page-remote" class="page">
 
-          <!-- Header card -->
+          <!-- Header info bar -->
+          <div style="background:linear-gradient(135deg,var(--bg-tertiary),var(--bg-secondary));border:1px solid var(--accent-dark);border-radius:10px;padding:18px 20px;margin-bottom:16px">
+            <div style="font-size:16px;font-weight:700;color:var(--accent);margin-bottom:10px;letter-spacing:0.2px">
+              Remote Access — Friend Connect
+            </div>
+            <div style="display:grid;gap:7px">
+              <div style="display:flex;align-items:flex-start;gap:8px;font-size:13px;color:var(--text-secondary)">
+                <span style="color:var(--accent);flex-shrink:0;margin-top:1px">●</span>
+                Used to access your Stardew game or StardropHost dashboard remotely
+              </div>
+              <div style="display:flex;align-items:flex-start;gap:8px;font-size:13px;color:var(--text-secondary)">
+                <span style="color:var(--accent);flex-shrink:0;margin-top:1px">●</span>
+                Invite friends with a co-op IP or domain name — not in-game invite codes
+              </div>
+              <div style="display:flex;align-items:flex-start;gap:8px;font-size:13px;color:var(--text-secondary)">
+                <span style="color:var(--accent);flex-shrink:0;margin-top:1px">●</span>
+                Host multiple game instances on one VM easily (depends on the service used)
+              </div>
+              <div style="display:flex;align-items:flex-start;gap:8px;font-size:13px;color:var(--text-secondary)">
+                <span style="color:var(--accent);flex-shrink:0;margin-top:1px">●</span>
+                Recommended: use <strong style="color:var(--text-primary)">playit.gg</strong> — tested and working. See the setup guide below.
+              </div>
+              <div style="display:flex;align-items:flex-start;gap:8px;font-size:13px;color:var(--text-secondary)">
+                <span style="color:var(--accent);flex-shrink:0;margin-top:1px">●</span>
+                Other services should work by following their own setup guides
+              </div>
+            </div>
+          </div>
+
+          <!-- Service Status card -->
           <div class="card" style="margin-bottom:16px">
-            <h3>Remote Access — Friend Connect</h3>
-            <ul style="font-size:13px;color:var(--text-secondary);line-height:1.8;margin:10px 0 0 18px;padding:0">
-              <li>Used to access your Stardew game or StardropHost dashboard remotely</li>
-              <li>Invite friends with a co-op IP or domain name — not in-game invite codes</li>
-              <li>Host multiple game instances on one VM easily (depends on the service used)</li>
-              <li>Recommended: use playit.gg — tested and working. See the setup guide below.</li>
-              <li>Other services should work by following their own setup guides</li>
-            </ul>
+            <h3>Service Status</h3>
+            <p style="font-size:13px;color:var(--text-secondary);margin:4px 0 12px">
+              Shows the status of your configured remote tunnel service. Set up and connect a service using the Compose Entry card below.
+            </p>
+            <div id="remoteLoading" style="color:var(--text-muted);font-size:13px">Loading...</div>
+            <div id="remoteNoConfig" style="display:none;font-size:13px;color:var(--text-muted)">
+              No service configured — paste a compose snippet in the entry below and click <strong>Apply &amp; Connect</strong>.
+            </div>
+            <div id="remoteConfigured" style="display:none">
+              <div id="remoteServiceStatus" style="margin-bottom:14px"></div>
+              <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+                <button class="btn btn-primary" type="button" id="remoteStartBtn"  onclick="startRemoteService()"  style="display:none">Resume</button>
+                <button class="btn"             type="button" id="remoteStopBtn"   onclick="stopRemoteService()"   style="display:none">Pause</button>
+                <button class="btn"             type="button" id="remoteEditBtn"   onclick="editRemoteCompose()"   >Edit Config</button>
+                <button class="btn"             type="button" id="remoteRemoveBtn" onclick="removeRemoteService()"
+                  style="color:#ef4444;border-color:#ef4444">Remove &amp; Stop</button>
+              </div>
+              <details style="margin-top:12px">
+                <summary style="font-size:12px;color:var(--text-muted);cursor:pointer;user-select:none">Show current compose config</summary>
+                <pre id="remoteCurrentYaml" style="margin:8px 0 0;background:var(--bg-primary);border:1px solid var(--border);border-radius:6px;padding:10px;font-size:12px;overflow-x:auto;line-height:1.5"></pre>
+              </details>
+            </div>
           </div>
 
           <!-- playit.gg guide (collapsible) -->
           <details class="card remote-guide" style="margin-bottom:16px">
             <summary>
-              <span style="font-weight:600;font-size:15px">playit.gg</span>
+              <span style="font-weight:600;font-size:15px">playit.gg Setup Guide</span>
               <span class="remote-badge">RECOMMENDED</span>
               <span style="color:var(--text-muted);font-size:13px;margin-left:8px">Paid / Free — No client setup needed</span>
             </summary>
 
             <div style="margin-top:14px;border-top:1px solid var(--border);padding-top:14px;font-size:13px;color:var(--text-secondary);line-height:1.75">
               <ul style="margin:0 0 6px 18px;padding:0">
-                <li>No client setup needed</li>
-                <li>Multiplatform — PC, Mobile, Console* <em style="color:var(--text-muted)">(Console untested)</em></li>
+                <li>No client setup needed — friends join directly with an address</li>
+                <li>Multiplatform — PC, Mobile, Console <em style="color:var(--text-muted)">(Console untested)</em></li>
               </ul>
-              <p style="margin:8px 0 4px">Premium is <strong>highly recommended</strong>. Free tier works but has no TCP — StardropHost/Stardew works on UDP (PC &amp; Mobile only). Consoles require TCP/UDP.</p>
+              <p style="margin:8px 0 4px">
+                Premium is <strong>highly recommended</strong>. Free tier works but has no TCP —
+                StardropHost/Stardew works on UDP (PC &amp; Mobile only). Consoles require TCP/UDP.
+              </p>
               <ul style="margin:0 0 4px 18px;padding:0">
-                <li>Paid is only ~$5/mo — worth it for custom domain names</li>
+                <li>Paid is only ~$5/mo — worth it for custom domain names and other premium features</li>
                 <li>Agents + Tunnels are essential for multi-instance Stardew / StardropHost installs</li>
                 <li>Supports firewall and proxy setup for safe, monitorable connections</li>
               </ul>
@@ -626,10 +672,10 @@
               <summary>Account Setup</summary>
               <ol class="remote-steps">
                 <li>Sign up for an account at <a href="https://playit.gg" target="_blank" rel="noopener noreferrer">playit.gg</a></li>
-                <li>Don't set up an agent yet — press <strong>"Exit Wizard"</strong></li>
-                <li>Purchase a Premium subscription (~$5/mo) — activation banner appears at the top</li>
-                <li>Go to <strong>Setup</strong> in the top bar → click <strong>"New Account Wizard"</strong></li>
-                <li>Select <strong>Docker</strong> when asked where to integrate playit</li>
+                <li><em style="color:var(--text-muted)">(Optional — Free tier)</em> Don't set up an agent yet — press <strong>"Exit Wizard"</strong> if prompted</li>
+                <li><em style="color:var(--text-muted)">(Optional — Free tier)</em> Purchase a Premium subscription (~$5/mo) — activation banner appears at the top of the dashboard</li>
+                <li><em style="color:var(--text-muted)">(Optional — Free tier)</em> Go to <strong>Setup</strong> in the top bar → click <strong>"New Account Wizard"</strong> → select <strong>Docker</strong> when asked where to integrate playit</li>
+                <li>Continue to <strong>Agent Setup</strong> below</li>
               </ol>
             </details>
 
@@ -637,12 +683,14 @@
             <details class="remote-sub">
               <summary>Agent Setup</summary>
               <ol class="remote-steps">
+                <li>In the playit.gg dashboard, go to <strong>Agents</strong> → <strong>Add Agent</strong></li>
                 <li>Name your agent (e.g. <code>StardropHost-1</code>) then press <strong>Next</strong></li>
-                <li>A Docker Run command will be shown — <strong>copy only the 64-character SECRET_KEY</strong>, not the whole command:<br>
-                  <code style="display:block;margin:6px 0;padding:8px 10px;background:var(--bg-primary);border-radius:4px;font-size:11px;word-break:break-all;line-height:1.6">docker run --rm -it --net=host -e SECRET_KEY=<strong style="color:var(--accent)">&#x25BA;&#x25BA;&#x25BA; COPY THIS KEY ONLY &#x25C4;&#x25C4;&#x25C4;</strong></code>
-                </li>
-                <li>Enter the key in the Compose entry below (see Docker Compose Example card) and click <strong>Apply &amp; Connect</strong></li>
-                <li>After connecting, the agent will show <strong>Connected</strong> in the playit.gg Agents tab</li>
+                <li>A setup page will appear — copy the <strong>64-character SECRET_KEY</strong> shown on the page<br>
+                  <em style="color:var(--text-muted);font-size:12px">*You may need to click <strong>Exit Wizard</strong> if the screen doesn't refresh after this step</em></li>
+                <li>Open the <strong>Docker Compose Example</strong> card below, replace <code>YOUR_SECRET_KEY</code> with your copied key, then copy the full block of text</li>
+                <li>Paste the compose snippet into the <strong>Compose Entry</strong> card below and click <strong>Apply &amp; Connect</strong></li>
+                <li>The agent will show <strong>Connected</strong> in the playit.gg Agents tab once running</li>
+                <li>Continue to <strong>Tunnel Setup</strong> below</li>
               </ol>
             </details>
 
@@ -650,80 +698,60 @@
             <details class="remote-sub">
               <summary>Tunnel Setup</summary>
               <ol class="remote-steps">
-                <li>Click the <strong>Tunnels</strong> tab on playit.gg → create a tunnel</li>
-                <li>Name it (e.g. <code>Stardrop-Share</code>), select type <strong>UDP</strong>, port count <strong>1</strong><br>
-                  <em style="color:var(--text-muted);font-size:12px">Additional ports can be used for multi-instances or remote dashboard access</em></li>
+                <li>Click the <strong>Tunnels</strong> tab on playit.gg → click <strong>Create Tunnel</strong></li>
+                <li>Name it (e.g. <code>Stardrop-Share</code>), select type <strong>UDP</strong><br>
+                  Set port count to <strong>1</strong> for game only, or <strong>2</strong> to also tunnel remote dashboard access</li>
                 <li>Give it a description (e.g. <em>Stardew Valley</em>), then complete the usage confirmation</li>
                 <li>For <strong>Public End Point</strong> — select the region closest to you</li>
-                <li>Copy your <strong>Local IP and Port</strong> from the StardropHost dashboard (e.g. <code>172.XX.X.X</code>, port <code>24642</code>)<br>
-                  <em style="color:var(--text-muted);font-size:12px">Use your panel port number (default 18642) to also share remote dashboard access</em></li>
+                <li>For <strong>Local IP &amp; Port</strong>: copy your server's <strong>LAN IP</strong> from the StardropHost dashboard home page and enter port <code>24642</code> for the game<br>
+                  <em style="color:var(--text-muted);font-size:12px">Change the port count to 2 in the earlier step to use your panel port number (default 18642) to remote access the StardropHost dashboard</em></li>
                 <li>For <strong>Proxy Protocol</strong> — see <a href="https://playit.gg/support/what-is-proxy-protocol/" target="_blank" rel="noopener noreferrer">playit.gg/support/what-is-proxy-protocol</a></li>
-                <li>Press <strong>Next</strong>, select the agent created above, then click <strong>Create Tunnel</strong></li>
-                <li>In the Tunnels tab your tunnel will show a <code>domain.name.playit.plus</code> address and an <code>XX.X.XXX.XX:XXXX</code> IP — share either with friends to connect from anywhere</li>
+                <li>Press <strong>Next</strong>, select the agent created in the Agent Setup above, then click <strong>Create Tunnel</strong></li>
+                <li>Your tunnel is now active. In the <strong>Tunnels tab</strong> you will see:<br>
+                  <span style="display:block;margin:6px 0 4px;padding:8px 12px;background:var(--bg-primary);border-radius:6px;font-family:monospace;font-size:12px;color:var(--text-primary)">
+                    Domain: <strong style="color:var(--accent)">yourname.playit.plus</strong><br>
+                    IP &amp; Port: <strong style="color:var(--accent)">12.34.56.78:12345</strong>
+                  </span>
+                  Share either the domain name <strong>or</strong> the IP &amp; Port with your friends — they enter it in Stardew Valley's co-op join screen to connect from anywhere
+                </li>
               </ol>
             </details>
 
           </details>
 
-          <!-- Docker Compose example card -->
-          <div class="card" style="margin-bottom:16px">
-            <h3>Docker Compose Example — playit.gg</h3>
-            <p style="font-size:13px;color:var(--text-secondary);margin:8px 0 12px;line-height:1.6">
-              Replace <code>YOUR_SECRET_KEY</code> with the key from your Agent Setup above, then copy and paste
-              the full snippet into the <strong>Remote Service</strong> entry below.
-            </p>
-            <pre style="background:var(--bg-primary);border:1px solid var(--border);border-radius:6px;padding:12px;font-size:12px;overflow-x:auto;margin:0;line-height:1.6">services:
+          <!-- Docker Compose example (collapsible) -->
+          <details class="card remote-guide" style="margin-bottom:16px">
+            <summary>
+              <span style="font-weight:600;font-size:15px">Docker Compose Example — playit.gg</span>
+            </summary>
+            <div style="margin-top:14px;border-top:1px solid var(--border);padding-top:14px">
+              <p style="font-size:13px;color:var(--text-secondary);margin:0 0 12px;line-height:1.6">
+                Replace <code>YOUR_SECRET_KEY</code> with the 64-character key from your Agent Setup, then
+                copy the <strong>entire block below</strong> and paste it into the Compose Entry card.
+              </p>
+              <pre style="background:var(--bg-primary);border:1px solid var(--border);border-radius:6px;padding:12px;font-size:12px;overflow-x:auto;margin:0;line-height:1.6;color:var(--text-primary)">services:
   playit:
     image: ghcr.io/playit-cloud/playit-agent:0.17
     network_mode: host
     restart: unless-stopped
     environment:
       - SECRET_KEY=YOUR_SECRET_KEY</pre>
-          </div>
+            </div>
+          </details>
 
-          <!-- Compose configuration card -->
+          <!-- Compose Entry card -->
           <div class="card" style="margin-bottom:16px">
-            <h3>Remote Service</h3>
-
-            <div id="remoteLoading" style="color:var(--text-muted);font-size:13px">Loading...</div>
-
-            <!-- State: not configured -->
-            <div id="remoteNoConfig" style="display:none">
-              <p style="font-size:13px;color:var(--text-secondary);margin:0 0 12px">
-                No remote service configured. Paste a <code>docker compose</code> snippet from your tunnel
-                provider below and click <strong>Apply &amp; Connect</strong>.
-              </p>
-              <textarea id="remoteComposeInput" class="input" rows="10"
-                placeholder="services:
-  your-tunnel:
-    image: provider/agent:latest
-    network_mode: host
-    restart: unless-stopped
-    environment:
-      - SECRET_KEY=your_key_here"
-                style="width:100%;font-family:monospace;font-size:12px;resize:vertical;line-height:1.5"></textarea>
-              <div id="remoteApplyMsg" style="margin:8px 0;font-size:13px;display:none"></div>
-              <div style="margin-top:10px">
-                <button class="btn btn-primary" type="button" id="remoteApplyBtn" onclick="applyRemoteCompose()">Apply &amp; Connect</button>
-              </div>
+            <h3>Compose Entry</h3>
+            <p style="font-size:13px;color:var(--text-secondary);margin:4px 0 12px;line-height:1.6">
+              Paste a <code>docker-compose</code> snippet from your tunnel provider and click <strong>Apply &amp; Connect</strong>.
+              The service will start automatically and status will update above.
+            </p>
+            <textarea id="remoteComposeInput" class="input" rows="10" placeholder=""
+              style="width:100%;font-family:monospace;font-size:12px;resize:vertical;line-height:1.5"></textarea>
+            <div id="remoteApplyMsg" style="margin:8px 0;font-size:13px;display:none"></div>
+            <div style="margin-top:10px">
+              <button class="btn btn-primary" type="button" id="remoteApplyBtn" onclick="applyRemoteCompose()">Apply &amp; Connect</button>
             </div>
-
-            <!-- State: configured -->
-            <div id="remoteConfigured" style="display:none">
-              <div id="remoteServiceStatus" style="margin-bottom:14px"></div>
-              <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:12px">
-                <button class="btn btn-primary" type="button" id="remoteStartBtn"  onclick="startRemoteService()"  style="display:none">Resume</button>
-                <button class="btn"             type="button" id="remoteStopBtn"   onclick="stopRemoteService()"   style="display:none">Pause</button>
-                <button class="btn"             type="button" id="remoteEditBtn"   onclick="editRemoteCompose()"   >Edit Config</button>
-                <button class="btn"             type="button" id="remoteRemoveBtn" onclick="removeRemoteService()"
-                  style="color:#ef4444;border-color:#ef4444">Remove &amp; Stop</button>
-              </div>
-              <details style="margin-top:4px">
-                <summary style="font-size:12px;color:var(--text-muted);cursor:pointer;user-select:none">Show current compose config</summary>
-                <pre id="remoteCurrentYaml" style="margin:8px 0 0;background:var(--bg-primary);border:1px solid var(--border);border-radius:6px;padding:10px;font-size:12px;overflow-x:auto;line-height:1.5"></pre>
-              </details>
-            </div>
-
           </div>
 
           <!-- Other services (collapsible) -->

@@ -19,7 +19,7 @@ LABEL maintainer="tomomotto" \
 RUN dpkg --add-architecture i386 && \
     apt-get update && apt-get install -y --no-install-recommends \
     # Core tools
-    wget curl unzip ca-certificates \
+    wget curl zip unzip ca-certificates \
     # SteamCMD 32-bit runtime requirements
     lib32gcc-s1 libcurl3-gnutls:i386 \
     # Game rendering
